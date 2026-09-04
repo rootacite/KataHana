@@ -38,6 +38,8 @@ import com.acite.katahana.domain.stoneLinks
 import com.acite.katahana.ai.QualityMark
 import com.acite.katahana.engine.Candidate
 import com.acite.katahana.engine.formatScoreLoss
+import com.acite.katahana.engine.lerpOwnership
+import com.acite.katahana.settings.OwnershipStyle
 import com.acite.katahana.ui.theme.HanaColors
 import com.acite.katahana.ui.theme.HanaMotion
 import com.acite.katahana.ui.theme.hanaAppearance
@@ -54,6 +56,9 @@ fun BoardCanvas(
     candidates: List<Candidate> = emptyList(),
     qualities: List<QualityMark> = emptyList(),
     showConnections: Boolean = false,
+    ownership: List<Double> = emptyList(),
+    showOwnership: Boolean = true,
+    ownershipStyle: OwnershipStyle = OwnershipStyle.Blocks,
 ) {
     val squash = remember { Animatable(1f) }
     var displayedNumber by remember { mutableIntStateOf(snapshot.moveNumber) }
@@ -82,6 +87,43 @@ fun BoardCanvas(
         ),
         label = "lastBreath",
     )
+    val ownershipPulse = rememberInfiniteTransition(label = "ownership")
+    val blockBounce = ownershipPulse.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 3400, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "blockBounce",
+    )
+    val fogDrift = ownershipPulse.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 9000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "fogDrift",
+    )
+    val starBreath = ownershipPulse.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 2400, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "starBreath",
+    )
+    val starTwinkle = ownershipPulse.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 14000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "starTwinkle",
+    )
     LaunchedEffect(snapshot.lastMove, snapshot.moveNumber) {
         if (snapshot.lastMove == null) {
             squash.snapTo(1f)
@@ -101,6 +143,22 @@ fun BoardCanvas(
     val measurer = rememberTextMeasurer()
     val boardSize = snapshot.size
     val appearance = hanaAppearance
+    val ownershipMorph = remember { OwnershipMorph() }
+    val morph = remember { Animatable(1f) }
+    LaunchedEffect(ownership, boardSize) {
+        val n = boardSize * boardSize
+        if (ownership.size != n) return@LaunchedEffect
+        val incoming = FloatArray(n) { i -> ownership[i].toFloat() }
+        val t = morph.value
+        ownershipMorph.from = when {
+            ownershipMorph.to.size == n && ownershipMorph.from.size == n ->
+                lerpOwnership(ownershipMorph.from, ownershipMorph.to, t)
+            else -> FloatArray(n)
+        }
+        ownershipMorph.to = incoming
+        morph.snapTo(0f)
+        morph.animateTo(1f, tween(durationMillis = 520, easing = FastOutSlowInEasing))
+    }
 
     Canvas(
         modifier = modifier
@@ -163,6 +221,29 @@ fun BoardCanvas(
                 strokeWidth = stroke,
             )
         }
+        if (showOwnership) {
+            val t = morph.value
+            val mixed = when {
+                ownershipMorph.to.size != boardSize * boardSize -> null
+                ownershipMorph.from.size != boardSize * boardSize || t >= 0.999f -> ownershipMorph.to
+                else -> lerpOwnership(ownershipMorph.from, ownershipMorph.to, t)
+            }
+            if (mixed != null) {
+                drawOwnershipLayer(
+                    values = mixed,
+                    boardSize = boardSize,
+                    gap = layout.gap,
+                    centerOf = { layout.center(it) },
+                    style = ownershipStyle,
+                    motion = OwnershipMotion(
+                        bounce = blockBounce.value,
+                        drift = fogDrift.value,
+                        breath = starBreath.value,
+                        twinkle = starTwinkle.value,
+                    ),
+                )
+            }
+        }
         val starR = (layout.gap * 0.09f).coerceAtLeast(2.5f)
         for (h in hoshiPoints(boardSize)) {
             drawHoshi(layout.center(h), starR)
@@ -217,7 +298,7 @@ fun BoardCanvas(
             drawLastMoveMark(
                 center = layout.center(point),
                 radius = stoneR,
-                lightStone = appearance.swatch(color).light,
+                swatch = appearance.swatch(color),
                 pulse = lastRipple.value,
                 breath = lastBreath.value,
             )
@@ -240,6 +321,11 @@ fun BoardCanvas(
             drawStone(snapshot.toPlay, appearance, layout.center(preview), stoneR, alpha = 0.42f)
         }
     }
+}
+
+private class OwnershipMorph {
+    var from: FloatArray = FloatArray(0)
+    var to: FloatArray = FloatArray(0)
 }
 
 private data class BoardLayout(

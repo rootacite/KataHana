@@ -6,7 +6,7 @@ import platform.Foundation.NSFileManager
 import platform.Foundation.NSUserDomainMask
 
 @OptIn(ExperimentalForeignApi::class)
-actual fun settingsFilePath(): String {
+actual fun appDir(): String {
     val url = NSFileManager.defaultManager.URLForDirectory(
         directory = NSDocumentDirectory,
         inDomain = NSUserDomainMask,
@@ -14,6 +14,7 @@ actual fun settingsFilePath(): String {
         create = true,
         error = null,
     )
-    val dir = requireNotNull(url?.path)
-    return "$dir/$SETTINGS_FILE"
+    return requireNotNull(url?.path)
 }
+
+actual fun settingsFilePath(): String = "${appDir()}/$SETTINGS_FILE"

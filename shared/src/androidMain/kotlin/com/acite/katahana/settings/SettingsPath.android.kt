@@ -17,5 +17,7 @@ private fun requireAppContext(): Context =
             .getMethod("currentApplication")
             .invoke(null) as Context
 
+actual fun appDir(): String = requireAppContext().filesDir.absolutePath
+
 actual fun settingsFilePath(): String =
-    File(requireAppContext().filesDir, SETTINGS_FILE).absolutePath
+    File(appDir(), SETTINGS_FILE).absolutePath

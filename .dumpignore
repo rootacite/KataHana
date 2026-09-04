@@ -1,0 +1,31 @@
+# Boilerplate / product copy (dumper already skips hidden dirs: .git .gradle .idea .kotlin)
+LICENSE
+README.md
+
+# Machine-local
+local.properties
+
+# Gradle wrapper scripts + binary; keep gradle/libs.versions.toml and *.properties
+gradlew
+gradlew.bat
+gradle/wrapper/gradle-wrapper.jar
+
+# Artwork, screenshots, launcher icons (binaries; still clutter the tree)
+katahana.jpg
+katahana_clip.png
+screenshots
+desktopApp/icons
+desktopApp/src/main/composeResources
+androidApp/src/main/res/drawable-nodpi
+androidApp/src/main/res/mipmap-hdpi
+androidApp/src/main/res/mipmap-mdpi
+androidApp/src/main/res/mipmap-xhdpi
+androidApp/src/main/res/mipmap-xxhdpi
+androidApp/src/main/res/mipmap-xxxhdpi
+iosApp/iosApp/Assets.xcassets/AppIcon.appiconset/app-icon-1024.png
+
+# iOS / Android generated leftovers if they appear
+captures
+xcuserdata
+.cxx
+.externalNativeBuild

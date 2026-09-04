@@ -1,5 +1,6 @@
 package com.acite.katahana
 
+import platform.Foundation.NSDate
 import platform.UIKit.UIDevice
 
 class IOSPlatform : Platform {
@@ -7,3 +8,5 @@ class IOSPlatform : Platform {
 }
 
 actual fun getPlatform(): Platform = IOSPlatform()
+
+actual fun epochMillis(): Long = (NSDate().timeIntervalSince1970 * 1000.0).toLong()

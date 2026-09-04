@@ -1,5 +1,12 @@
 package com.acite.katahana.ui.settings
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -26,17 +33,23 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
+import com.acite.katahana.settings.OwnershipStyle
 import com.acite.katahana.ui.Copy
+import com.acite.katahana.ui.board.OwnershipMotion
+import com.acite.katahana.ui.board.drawOwnershipLayer
 import com.acite.katahana.ui.board.drawStoneSwatch
+import com.acite.katahana.domain.Point
+import com.acite.katahana.ui.components.HanaField
 import com.acite.katahana.ui.components.QuietTextButton
-import com.acite.katahana.ui.engine.HanaField
 import com.acite.katahana.ui.theme.Appearance
 import com.acite.katahana.ui.theme.HanaColors
 import com.acite.katahana.ui.theme.StoneSwatch
@@ -56,6 +69,7 @@ private fun SettingsRoute(vm: SettingsViewModel) {
     val confirm by vm.confirmMove.collectAsState()
     val coords by vm.showCoords.collectAsState()
     val appearanceId by vm.appearanceId.collectAsState()
+    val ownershipStyle by vm.ownershipStyle.collectAsState()
     val quality by vm.quality.collectAsState()
     val tokens = hanaTokens
 
@@ -104,6 +118,39 @@ private fun SettingsRoute(vm: SettingsViewModel) {
             }
         }
         Spacer(Modifier.height(24.dp))
+        Text(Copy.ownershipStyle, color = HanaColors.text, fontSize = 18.sp)
+        Spacer(Modifier.height(4.dp))
+        Text(Copy.ownershipStyleHint, color = HanaColors.textDim, fontSize = 13.sp)
+        Spacer(Modifier.height(12.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            OwnershipStyle.entries.forEach { style ->
+                val selected = style == ownershipStyle
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(tokens.card)
+                        .background(HanaColors.bgCard)
+                        .then(
+                            if (selected) {
+                                Modifier.border(1.5.dp, HanaColors.accentPink, tokens.card)
+                            } else {
+                                Modifier.border(1.dp, HanaColors.stroke, tokens.card)
+                            },
+                        )
+                        .clickable { vm.setOwnershipStyle(style) }
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    OwnershipStylePreview(style)
+                    Spacer(Modifier.size(14.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(styleTitle(style), color = HanaColors.text, fontSize = 15.sp)
+                        Text(styleBlurb(style), color = HanaColors.textDim, fontSize = 12.sp)
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(24.dp))
         ToggleRow(Copy.confirmMove, confirm, vm::setConfirmMove)
         Spacer(Modifier.height(8.dp))
         ToggleRow(Copy.showCoords, coords, vm::setShowCoords)
@@ -127,6 +174,99 @@ private fun SettingsRoute(vm: SettingsViewModel) {
         ThresholdField("Fair", quality.fair) {
             vm.setQuality(quality.copy(fair = it))
         }
+    }
+}
+
+private fun styleTitle(style: OwnershipStyle): String = when (style) {
+    OwnershipStyle.Blocks -> Copy.ownershipBlocks
+    OwnershipStyle.Fog -> Copy.ownershipFog
+    OwnershipStyle.Constellation -> Copy.ownershipStars
+}
+
+private fun styleBlurb(style: OwnershipStyle): String = when (style) {
+    OwnershipStyle.Blocks -> Copy.ownershipBlocksHint
+    OwnershipStyle.Fog -> Copy.ownershipFogHint
+    OwnershipStyle.Constellation -> Copy.ownershipStarsHint
+}
+
+@Composable
+private fun OwnershipStylePreview(style: OwnershipStyle) {
+    val pulse = rememberInfiniteTransition(label = "ownershipPreview")
+    val bounce by pulse.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(3400, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "previewBounce",
+    )
+    val drift by pulse.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(9000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "previewDrift",
+    )
+    val breath by pulse.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2400, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "previewBreath",
+    )
+    val twinkle by pulse.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(14000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "previewTwinkle",
+    )
+    Canvas(
+        Modifier
+            .size(64.dp)
+            .clip(hanaTokens.panel),
+    ) {
+        drawRoundRect(
+            color = HanaColors.boardBg,
+            topLeft = Offset.Zero,
+            size = Size(this.size.width, this.size.height),
+            cornerRadius = CornerRadius(12.dp.toPx(), 12.dp.toPx()),
+        )
+        val n = 5
+        val inset = this.size.minDimension * 0.16f
+        val span = this.size.minDimension - inset * 2f
+        val gap = span / (n - 1).toFloat()
+        val origin = Offset(
+            (this.size.width - span) / 2f,
+            (this.size.height - span) / 2f,
+        )
+        val values = FloatArray(n * n) { i ->
+            val x = i % n
+            val y = i / n
+            val across = 1f - 2f * x / (n - 1).toFloat()
+            val fade = 1f - 0.35f * kotlin.math.abs(y - 2) / 2f
+            across * fade
+        }
+        drawOwnershipLayer(
+            values = values,
+            boardSize = n,
+            gap = gap,
+            centerOf = { p: Point -> Offset(origin.x + p.x * gap, origin.y + p.y * gap) },
+            style = style,
+            motion = OwnershipMotion(
+                bounce = bounce,
+                drift = drift,
+                breath = breath,
+                twinkle = twinkle,
+            ),
+        )
     }
 }
 

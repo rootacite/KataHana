@@ -98,6 +98,32 @@ class GameTreeTest {
     }
 
     @Test
+    fun preferredLineFollowsPreferredChildPastCurrent() {
+        val tree = GameTree(9)
+        tree.play(Point(4, 4))
+        tree.play(Point(3, 3))
+        val leaf = tree.current.id
+        tree.undo()
+        val mid = tree.current.id
+        assertEquals(listOf("n0", mid, leaf), tree.preferredLine().map { it.id })
+        assertEquals(mid, tree.current.id)
+    }
+
+    @Test
+    fun pathMovesDoesNotMoveCurrent() {
+        val tree = GameTree(9)
+        tree.play(Point(4, 4))
+        val first = tree.current
+        tree.play(Point(3, 3))
+        val currentId = tree.current.id
+        val moves = tree.pathMoves(first)
+        assertEquals(1, moves.size)
+        assertIs<Move.Place>(moves[0])
+        assertEquals(Point(4, 4), (moves[0] as Move.Place).point)
+        assertEquals(currentId, tree.current.id)
+    }
+
+    @Test
     fun reviewingIsTrueExactlyWhenNotAtALeaf() {
         val tree = GameTree(9)
         assertFalse(tree.reviewing)
@@ -107,5 +133,21 @@ class GameTreeTest {
         assertTrue(tree.reviewing)
         tree.redo()
         assertFalse(tree.reviewing)
+    }
+
+    @Test
+    fun childPathRoundTripsThroughVariation() {
+        val tree = GameTree(9)
+        tree.play(Point(2, 2))
+        tree.undo()
+        tree.play(Point(4, 4))
+        tree.play(Point(5, 5))
+        val path = tree.childPath()
+        assertEquals(listOf(1, 0), path)
+        tree.applyChildPath(emptyList())
+        assertEquals(tree.root.id, tree.current.id)
+        assertTrue(tree.applyChildPath(path))
+        assertEquals(Point(5, 5), (tree.current.move as Move.Place).point)
+        assertEquals(Point(4, 4), (tree.current.parent?.move as Move.Place).point)
     }
 }

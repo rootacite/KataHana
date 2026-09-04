@@ -1,6 +1,7 @@
 package com.acite.katahana.engine
 
 import com.acite.katahana.domain.GameTree
+import com.acite.katahana.domain.Node
 import com.acite.katahana.domain.StoneColor
 import com.acite.katahana.settings.SettingsRepository
 import dev.zacsweers.metro.AppScope
@@ -125,6 +126,24 @@ class AnalysisClient @Inject constructor(
         val response = sendAndAwaitFinal(
             query,
             InFlight(query.id, sessionId, nodeId, tree.size, tree.current.position.toPlay),
+        )
+        if (response.error != null) error(response.error)
+        return response
+    }
+
+    suspend fun queryReview(sessionId: String, tree: GameTree, node: Node): AnalysisResponse {
+        val nonce = Random.nextLong().toULong().toString(16)
+        val query = buildReviewQuery(
+            sessionId = sessionId,
+            nodeId = node.id,
+            nonce = nonce,
+            tree = tree,
+            moves = tree.pathMoves(node),
+            maxVisits = currentProfile.reviewVisits,
+        )
+        val response = sendAndAwaitFinal(
+            query,
+            InFlight(query.id, sessionId, node.id, tree.size, node.position.toPlay),
         )
         if (response.error != null) error(response.error)
         return response
@@ -284,6 +303,7 @@ class AnalysisClient @Inject constructor(
             isDuringSearch = response.isDuringSearch,
             moveInfos = response.moveInfos,
             toPlay = flight.toPlay,
+            ownership = response.ownership,
         )
         if (!response.isDuringSearch) {
             _status.value = EngineStatus(EnginePhase.Ready)

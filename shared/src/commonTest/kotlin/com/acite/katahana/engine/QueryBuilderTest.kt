@@ -20,9 +20,29 @@ class QueryBuilderTest {
         assertEquals(7.5, query.komi, 1e-6)
         assertTrue(query.id.contains(":live:"))
         assertTrue(query.id.startsWith("sess:${tree.current.id}:live:"))
-        assertEquals(false, query.includeOwnership)
+        assertEquals(true, query.includeOwnership)
         assertEquals(false, query.includePolicy)
+        assertEquals(12, query.analysisPVLen)
         assertEquals("BLACK", query.overrideSettings.reportAnalysisWinratesAs)
+    }
+
+    @Test
+    fun reviewQueryUsesPathMovesAndReviewPurpose() {
+        val tree = GameTree(9)
+        tree.play(Point(4, 4))
+        val node = tree.current
+        tree.play(Point(3, 3))
+        val currentId = tree.current.id
+        val moves = tree.pathMoves(node)
+        val query = buildReviewQuery("sess", node.id, "ab", tree, moves, maxVisits = 400)
+        assertTrue(query.id.contains(":review:"))
+        assertTrue(query.id.startsWith("sess:${node.id}:review:"))
+        assertEquals(true, query.includeOwnership)
+        assertEquals(12, query.analysisPVLen)
+        assertEquals(400, query.maxVisits)
+        assertEquals(listOf(listOf("B", "E5")), query.moves)
+        assertEquals(listOf(1), query.analyzeTurns)
+        assertEquals(currentId, tree.current.id)
     }
 
     @Test

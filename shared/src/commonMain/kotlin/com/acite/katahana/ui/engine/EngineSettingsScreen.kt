@@ -10,10 +10,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -27,11 +24,11 @@ import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import com.acite.katahana.ui.Copy
 import com.acite.katahana.ui.components.CapsuleButton
+import com.acite.katahana.ui.components.HanaField
 import com.acite.katahana.ui.session.engineStatusLabel
 import com.acite.katahana.ui.components.QuietTextButton
 import com.acite.katahana.ui.settings.SettingsViewModel
 import com.acite.katahana.ui.theme.HanaColors
-import com.acite.katahana.ui.theme.hanaTokens
 import dev.zacsweers.metrox.viewmodel.metroViewModel
 
 class EngineSettingsScreen : Screen {
@@ -109,33 +106,4 @@ private fun EngineSettingsRoute(vm: SettingsViewModel) {
     }
 }
 
-@Composable
-internal fun HanaField(
-    label: String,
-    value: String,
-    onChange: (String) -> Unit,
-    placeholder: String? = null,
-    keyboard: KeyboardType = KeyboardType.Text,
-) {
-    OutlinedTextField(
-        value = value,
-        onValueChange = onChange,
-        label = { Text(label) },
-        placeholder = placeholder?.let { { Text(it, color = HanaColors.textDim) } },
-        singleLine = true,
-        keyboardOptions = KeyboardOptions(keyboardType = keyboard),
-        shape = hanaTokens.panel,
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = HanaColors.accentPink,
-            unfocusedBorderColor = HanaColors.stroke,
-            focusedLabelColor = HanaColors.accentLilac,
-            unfocusedLabelColor = HanaColors.textDim,
-            focusedTextColor = HanaColors.text,
-            unfocusedTextColor = HanaColors.text,
-            cursorColor = HanaColors.accentPink,
-            focusedContainerColor = HanaColors.bgCard,
-            unfocusedContainerColor = HanaColors.bgCard,
-        ),
-        modifier = Modifier.fillMaxWidth(),
-    )
-}
+

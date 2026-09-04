@@ -27,6 +27,7 @@ data class AnalysisQuery(
     val includeOwnership: Boolean = false,
     val includePolicy: Boolean = false,
     val reportDuringSearchEvery: Double? = null,
+    val analysisPVLen: Int? = null,
     val overrideSettings: OverrideSettings = OverrideSettings(),
 )
 
@@ -55,6 +56,7 @@ data class AnalysisResponse(
     val rootInfo: RootInfo? = null,
     val moveInfos: List<MoveInfo> = emptyList(),
     val policy: List<Double> = emptyList(),
+    val ownership: List<Double> = emptyList(),
 )
 
 @Serializable

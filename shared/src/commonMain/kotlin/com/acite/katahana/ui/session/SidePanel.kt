@@ -32,6 +32,7 @@ import com.acite.katahana.domain.StoneColor
 import com.acite.katahana.domain.TreeLayout
 import com.acite.katahana.domain.rankLabel
 import com.acite.katahana.engine.Candidate
+import com.acite.katahana.engine.formatPv
 import com.acite.katahana.engine.formatScoreLoss
 import com.acite.katahana.ui.Copy
 import com.acite.katahana.ui.components.CapsuleButton
@@ -61,11 +62,19 @@ fun SidePanel(
     onCycleVariation: (Int) -> Unit = {},
     onGoToNode: (String) -> Unit = {},
     tree: TreeLayout? = null,
-    onSaveSgf: () -> Unit = {},
+    dirty: Boolean = false,
+    canSave: Boolean = false,
+    onSave: () -> Unit = {},
+    onSaveAs: () -> Unit = {},
+    onExportSgf: () -> Unit = {},
     showConnections: Boolean = false,
     onShowConnectionsChange: (Boolean) -> Unit = {},
     showCoords: Boolean = true,
     onShowCoordsChange: (Boolean) -> Unit = {},
+    showOwnership: Boolean = false,
+    onShowOwnershipChange: (Boolean) -> Unit = {},
+    reviewProgress: ReviewProgress? = null,
+    onAnalyzeGame: () -> Unit = {},
     onBack: (() -> Unit)? = null,
     onSettings: (() -> Unit)? = null,
 ) {
@@ -150,13 +159,47 @@ fun SidePanel(
             checked = showCoords,
             onChange = onShowCoordsChange,
         )
+        ToggleCard(
+            label = Copy.showOwnership,
+            checked = showOwnership,
+            onChange = onShowOwnershipChange,
+        )
+        val reviewing = reviewProgress?.running == true
+        CapsuleButton(
+            if (reviewing) Copy.cancelReview else Copy.analyzeGame,
+            onAnalyzeGame,
+            modifier = Modifier.fillMaxWidth(),
+            enabled = engineOnline || reviewing,
+        )
+        reviewProgress?.let { progress ->
+            Text(
+                Copy.reviewProgress(progress.done, progress.total),
+                color = if (progress.running) HanaColors.accentLilac else HanaColors.textDim,
+                fontSize = 13.sp,
+            )
+        }
         CandidatesCard(
             engineOnline = engineOnline,
             analyzing = analyzing,
             candidates = candidates,
             showCandidates = showCandidates,
         )
-        CapsuleButton(Copy.saveSgf, onSaveSgf, modifier = Modifier.fillMaxWidth())
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            CapsuleButton(
+                Copy.save,
+                onSave,
+                modifier = Modifier.weight(1f),
+                emphasized = dirty,
+                enabled = canSave,
+            )
+            CapsuleButton(
+                Copy.saveAs,
+                onSaveAs,
+                modifier = Modifier.weight(1f),
+                enabled = canSave,
+            )
+        }
+        CapsuleButton(Copy.exportSgf, onExportSgf, modifier = Modifier.fillMaxWidth())
     }
 }
 
@@ -239,7 +282,11 @@ private fun CandidatesCard(
                     color = HanaColors.text,
                     fontSize = 13.sp,
                 )
-                if (index != candidates.lastIndex) Spacer(Modifier.height(4.dp))
+                val pv = formatPv(candidate.pv)
+                if (pv.isNotEmpty()) {
+                    Text(pv, color = HanaColors.textDim, fontSize = 12.sp)
+                }
+                if (index != candidates.lastIndex) Spacer(Modifier.height(6.dp))
             }
         }
     }

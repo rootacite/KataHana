@@ -48,10 +48,14 @@ import com.acite.katahana.domain.GameTree
 import com.acite.katahana.engine.EnginePhase
 import com.acite.katahana.engine.EngineStatus
 import com.acite.katahana.sgf.LocalSgfFiles
+import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.backhandler.BackHandler
 import com.acite.katahana.ui.Copy
 import com.acite.katahana.ui.board.BoardCanvas
 import com.acite.katahana.ui.components.EngineDot
+import com.acite.katahana.ui.components.LeaveGameDialog
 import com.acite.katahana.ui.components.QuietTextButton
+import com.acite.katahana.ui.components.SaveNameDialog
 import com.acite.katahana.ui.components.WinrateTrack
 import com.acite.katahana.ui.settings.SettingsScreen
 import com.acite.katahana.ui.theme.HanaColors
@@ -63,6 +67,8 @@ import kotlinx.coroutines.launch
 class SessionScreen(
     private val config: GameConfig,
     private val loadedTree: GameTree? = null,
+    private val recentId: String? = null,
+    private val recentTitle: String? = null,
     private val instanceId: String = Random.nextLong().toULong().toString(16),
 ) : Screen {
     override val key: ScreenKey = "session-$instanceId"
@@ -72,12 +78,13 @@ class SessionScreen(
         val vm = assistedMetroViewModel<SessionViewModel, SessionViewModel.Factory>(
             key = key,
         ) {
-            create(config, loadedTree)
+            create(config, loadedTree, recentId, recentTitle)
         }
         SessionRoute(vm)
     }
 }
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 private fun SessionRoute(vm: SessionViewModel) {
     val ui by vm.state.collectAsState()
@@ -85,6 +92,8 @@ private fun SessionRoute(vm: SessionViewModel) {
     val showCandidates by vm.showCandidates.collectAsState()
     val showQuality by vm.showQuality.collectAsState()
     val showConnections by vm.showConnections.collectAsState()
+    val showOwnership by vm.showOwnership.collectAsState()
+    val ownershipStyle by vm.ownershipStyle.collectAsState()
     val navigator = LocalNavigator.currentOrThrow
     val snapshot = ui.snapshot
     val boardCandidates = if (showCandidates) ui.candidates else emptyList()
@@ -92,11 +101,47 @@ private fun SessionRoute(vm: SessionViewModel) {
     val sgfFiles = LocalSgfFiles.current
     val scope = rememberCoroutineScope()
     var drawerOpen by remember { mutableStateOf(false) }
-    val saveSgf: () -> Unit = {
+    var leaveAsk by remember { mutableStateOf(false) }
+    var nameAsk by remember { mutableStateOf(false) }
+    var nameThenLeave by remember { mutableStateOf(false) }
+    var nameDraft by remember { mutableStateOf("") }
+    val exportSgf: () -> Unit = {
         scope.launch {
             sgfFiles.save(vm.sgfFileName(), vm.sgfText())
         }
     }
+    val actuallyLeave: () -> Unit = {
+        vm.leave()
+        drawerOpen = false
+        leaveAsk = false
+        nameAsk = false
+        navigator.pop()
+    }
+    val requestLeave: () -> Unit = {
+        drawerOpen = false
+        if (!ui.dirty) actuallyLeave() else leaveAsk = true
+    }
+    val performSave: (Boolean) -> Unit = { thenLeave ->
+        scope.launch {
+            when (vm.save()) {
+                SaveOutcome.NeedsName -> {
+                    nameDraft = vm.suggestedTitle()
+                    nameThenLeave = thenLeave
+                    leaveAsk = false
+                    nameAsk = true
+                }
+                SaveOutcome.Saved -> if (thenLeave) actuallyLeave()
+                SaveOutcome.Failed -> Unit
+            }
+        }
+    }
+    val performSaveAs: (String, Boolean) -> Unit = { name, thenLeave ->
+        scope.launch {
+            if (vm.saveAs(name) == SaveOutcome.Saved && thenLeave) actuallyLeave()
+            nameAsk = false
+        }
+    }
+    BackHandler { requestLeave() }
 
     Column(
         Modifier
@@ -127,6 +172,9 @@ private fun SessionRoute(vm: SessionViewModel) {
                         candidates = boardCandidates,
                         qualities = boardQualities,
                         showConnections = showConnections,
+                        ownership = ui.ownership,
+                        showOwnership = showOwnership,
+                        ownershipStyle = ownershipStyle,
                     )
                 }
                 if (showSideTree) {
@@ -172,6 +220,10 @@ private fun SessionRoute(vm: SessionViewModel) {
                     onShowConnectionsChange = vm::setShowConnections,
                     showCoords = coords,
                     onShowCoordsChange = vm::setShowCoords,
+                    showOwnership = showOwnership,
+                    onShowOwnershipChange = vm::setShowOwnership,
+                    reviewProgress = ui.reviewProgress,
+                    onAnalyzeGame = vm::analyzeGame,
                     aiThinking = ui.aiThinking,
                     aiError = ui.aiError,
                     onPass = vm::pass,
@@ -181,12 +233,16 @@ private fun SessionRoute(vm: SessionViewModel) {
                     onCycleVariation = vm::cycleVariation,
                     onGoToNode = vm::goToNode,
                     tree = ui.tree,
-                    onSaveSgf = saveSgf,
-                    onBack = {
-                        vm.leave()
-                        drawerOpen = false
-                        navigator.pop()
+                    dirty = ui.dirty,
+                    canSave = ui.canSave,
+                    onSave = { performSave(false) },
+                    onSaveAs = {
+                        nameDraft = vm.suggestedTitle()
+                        nameThenLeave = false
+                        nameAsk = true
                     },
+                    onExportSgf = exportSgf,
+                    onBack = requestLeave,
                     onSettings = {
                         drawerOpen = false
                         navigator.push(SettingsScreen())
@@ -195,6 +251,20 @@ private fun SessionRoute(vm: SessionViewModel) {
                 )
             }
         }
+    }
+    if (leaveAsk) {
+        LeaveGameDialog(
+            onSave = { performSave(true) },
+            onDiscard = actuallyLeave,
+            onCancel = { leaveAsk = false },
+        )
+    }
+    if (nameAsk) {
+        SaveNameDialog(
+            initial = nameDraft,
+            onConfirm = { performSaveAs(it, nameThenLeave) },
+            onCancel = { nameAsk = false },
+        )
     }
 }
 

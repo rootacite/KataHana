@@ -1,6 +1,7 @@
 package com.acite.katahana.ui.home
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -17,7 +18,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
@@ -38,6 +41,9 @@ import androidx.compose.ui.window.Dialog
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
+import com.acite.katahana.epochMillis
+import com.acite.katahana.recents.RecentGame
+import com.acite.katahana.recents.formatSavedAt
 import com.acite.katahana.sgf.LocalSgfFiles
 import com.acite.katahana.sgf.parseSgf
 import com.acite.katahana.ui.Copy
@@ -46,7 +52,6 @@ import com.acite.katahana.ui.components.QuietTextButton
 import com.acite.katahana.ui.engine.EngineSettingsScreen
 import com.acite.katahana.ui.session.SessionScreen
 import com.acite.katahana.ui.settings.SettingsScreen
-import com.acite.katahana.ui.settings.SettingsViewModel
 import com.acite.katahana.ui.theme.HanaColors
 import com.acite.katahana.ui.theme.hanaTokens
 import dev.zacsweers.metrox.viewmodel.metroViewModel
@@ -67,8 +72,9 @@ private fun HomeRoute() {
     val tokens = hanaTokens
     val sgfFiles = LocalSgfFiles.current
     val scope = rememberCoroutineScope()
-    val settingsVm = metroViewModel<SettingsViewModel>()
-    val lastGame by settingsVm.lastGame.collectAsState()
+    val homeVm = metroViewModel<HomeViewModel>()
+    val lastGame by homeVm.lastGame.collectAsState()
+    val recents by homeVm.recentGames.collectAsState()
 
     BoxWithConstraints(
         Modifier
@@ -106,6 +112,7 @@ private fun HomeRoute() {
                 Modifier
                     .widthIn(max = 520.dp)
                     .align(Alignment.Center)
+                    .verticalScroll(rememberScrollState())
                     .padding(24.dp),
             ) {
                 Text(
@@ -141,14 +148,37 @@ private fun HomeRoute() {
                 Spacer(Modifier.height(28.dp))
                 Text(Copy.recent, color = HanaColors.text, fontSize = 16.sp)
                 Spacer(Modifier.height(10.dp))
-                Box(
-                    Modifier
-                        .fillMaxWidth()
-                        .clip(tokens.card)
-                        .background(HanaColors.bgCard)
-                        .padding(18.dp),
-                ) {
-                    Text(Copy.noRecent, color = HanaColors.textDim, fontSize = 14.sp)
+                if (recents.isEmpty()) {
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .clip(tokens.card)
+                            .background(HanaColors.bgCard)
+                            .padding(18.dp),
+                    ) {
+                        Text(Copy.noRecent, color = HanaColors.textDim, fontSize = 14.sp)
+                    }
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        recents.forEach { game ->
+                            RecentGameCard(
+                                game = game,
+                                now = epochMillis(),
+                                onOpen = {
+                                    val loaded = homeVm.openRecent(game.id) ?: return@RecentGameCard
+                                    navigator.push(
+                                        SessionScreen(
+                                            config = loaded.config,
+                                            loadedTree = loaded.tree,
+                                            recentId = loaded.record.id,
+                                            recentTitle = loaded.record.title,
+                                        ),
+                                    )
+                                },
+                                onRemove = { homeVm.removeRecent(game.id) },
+                            )
+                        }
+                    }
                 }
                 Spacer(Modifier.height(20.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -160,7 +190,7 @@ private fun HomeRoute() {
 
         if (showNew) {
             val start: (com.acite.katahana.domain.GameConfig) -> Unit = { config ->
-                settingsVm.saveLastGame(config)
+                homeVm.saveLastGame(config)
                 showNew = false
                 navigator.push(SessionScreen(config))
             }
@@ -187,5 +217,36 @@ private fun HomeRoute() {
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun RecentGameCard(
+    game: RecentGame,
+    now: Long,
+    onOpen: () -> Unit,
+    onRemove: () -> Unit,
+) {
+    val tokens = hanaTokens
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(tokens.card)
+            .background(HanaColors.bgCard)
+            .clickable(onClick = onOpen)
+            .padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(game.title, color = HanaColors.text, fontSize = 15.sp)
+            Spacer(Modifier.height(4.dp))
+            Text(game.modeLine(), color = HanaColors.textDim, fontSize = 12.sp)
+            Text(
+                formatSavedAt(game.savedAt, now),
+                color = HanaColors.accentLilac,
+                fontSize = 12.sp,
+            )
+        }
+        QuietTextButton(Copy.remove, onClick = onRemove)
     }
 }

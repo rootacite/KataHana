@@ -30,6 +30,9 @@ fun toBlackViewFromSideToMove(
 const val ACCEPTABLE_POINTS_LOST = 1.5
 const val MAX_CANDIDATES = 10
 
+const val OWNERSHIP_SKIP = 0.08
+const val PV_DISPLAY_LEN = 12
+
 data class Candidate(
     val point: Point?,
     val gtp: String,
@@ -38,6 +41,7 @@ data class Candidate(
     val visits: Int,
     val order: Int,
     val pointsLost: Double,
+    val pv: List<String> = emptyList(),
 )
 
 data class LiveAnalysis(
@@ -51,6 +55,7 @@ data class LiveAnalysis(
     val isDuringSearch: Boolean,
     val moveInfos: List<MoveInfo> = emptyList(),
     val toPlay: StoneColor = StoneColor.Black,
+    val ownership: List<Double> = emptyList(),
 )
 
 fun parseLiveQueryId(id: String): Pair<String, String>? {
@@ -103,6 +108,7 @@ fun selectCandidates(
             visits = info.visits,
             order = info.order,
             pointsLost = pointsLost(bestLead, info.scoreLead, toPlay),
+            pv = info.pv,
         )
     }
     val playable = mapped.filter { !it.gtp.equals("pass", ignoreCase = true) }
@@ -110,3 +116,25 @@ fun selectCandidates(
     val acceptable = source.filter { it.pointsLost <= maxPointsLost }
     return (if (acceptable.isNotEmpty()) acceptable else source.take(1)).take(limit)
 }
+
+/** KataGo ownership is row-major from top-left (A19) to bottom-right (T1), black-positive. */
+fun ownershipIndex(point: Point, size: Int): Int = point.index(size)
+
+fun formatPv(pv: List<String>, limit: Int = PV_DISPLAY_LEN): String =
+    pv.take(limit).joinToString(" ")
+
+/** Keep the last complete map when the new node has no eval yet. */
+fun heldOwnership(previous: List<Double>, incoming: List<Double>, boardSize: Int): List<Double> {
+    val n = boardSize * boardSize
+    if (incoming.size == n) return incoming
+    return if (previous.size == n) previous else emptyList()
+}
+
+fun lerpOwnership(from: FloatArray, to: FloatArray, t: Float): FloatArray {
+    val n = minOf(from.size, to.size)
+    if (n == 0) return FloatArray(0)
+    val u = t.coerceIn(0f, 1f)
+    val v = 1f - u
+    return FloatArray(n) { i -> from[i] * v + to[i] * u }
+}
+

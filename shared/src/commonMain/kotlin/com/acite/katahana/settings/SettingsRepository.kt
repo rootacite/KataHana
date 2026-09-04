@@ -39,6 +39,10 @@ class SettingsRepository @Inject constructor() {
     val showCandidates: Flow<Boolean> = dataStore.data.map { it[Keys.SHOW_CANDIDATES] ?: true }
     val showQuality: Flow<Boolean> = dataStore.data.map { it[Keys.SHOW_QUALITY] ?: true }
     val showConnections: Flow<Boolean> = dataStore.data.map { it[Keys.SHOW_CONNECTIONS] ?: false }
+    val showOwnership: Flow<Boolean> = dataStore.data.map { it[Keys.SHOW_OWNERSHIP] ?: false }
+    val ownershipStyle: Flow<OwnershipStyle> = dataStore.data.map {
+        OwnershipStyle.fromId(it[Keys.OWNERSHIP_STYLE])
+    }
     val appearanceId: Flow<String> = dataStore.data.map {
         it[Keys.APPEARANCE] ?: "sky_sakura"
     }
@@ -84,6 +88,8 @@ class SettingsRepository @Inject constructor() {
     suspend fun setShowCandidates(value: Boolean) = edit { it[Keys.SHOW_CANDIDATES] = value }
     suspend fun setShowQuality(value: Boolean) = edit { it[Keys.SHOW_QUALITY] = value }
     suspend fun setShowConnections(value: Boolean) = edit { it[Keys.SHOW_CONNECTIONS] = value }
+    suspend fun setShowOwnership(value: Boolean) = edit { it[Keys.SHOW_OWNERSHIP] = value }
+    suspend fun setOwnershipStyle(value: OwnershipStyle) = edit { it[Keys.OWNERSHIP_STYLE] = value.id }
     suspend fun setAppearanceId(value: String) = edit { it[Keys.APPEARANCE] = value }
     suspend fun setEngineName(value: String) = edit { it[Keys.ENGINE_NAME] = value }
     suspend fun setEngineUrl(value: String) = edit { it[Keys.ENGINE_URL] = value }
@@ -117,6 +123,8 @@ class SettingsRepository @Inject constructor() {
         val SHOW_CANDIDATES = booleanPreferencesKey("show_candidates")
         val SHOW_QUALITY = booleanPreferencesKey("show_quality")
         val SHOW_CONNECTIONS = booleanPreferencesKey("show_connections")
+        val SHOW_OWNERSHIP = booleanPreferencesKey("show_ownership")
+        val OWNERSHIP_STYLE = stringPreferencesKey("ownership_style")
         val APPEARANCE = stringPreferencesKey("appearance")
         val ENGINE_NAME = stringPreferencesKey("engine_name")
         val ENGINE_URL = stringPreferencesKey("engine_url")

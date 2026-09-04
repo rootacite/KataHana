@@ -1,5 +1,6 @@
 package com.acite.katahana.engine
 
+import com.acite.katahana.domain.GameTree
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -27,6 +28,18 @@ class AnalysisDtoTest {
         assertEquals("E5", response.moveInfos[0].move)
         assertEquals(0, response.moveInfos[0].order)
         assertNull(response.error)
+        assertEquals(emptyList(), response.ownership)
+        assertEquals(listOf("E5", "G5", "F6", "D6"), response.moveInfos[0].pv)
+    }
+
+    @Test
+    fun parsesOwnershipWhenRequested() {
+        val query = buildLiveQuery("s", "n0", "1", GameTree(9), maxVisits = 8)
+        val json = FakeAnalysisServer.reply(analysisJson.encodeToString(AnalysisQuery.serializer(), query))
+        val response = analysisJson.decodeFromString(AnalysisResponse.serializer(), json)
+        assertEquals(81, response.ownership.size)
+        assertEquals(1.0, response.ownership.first(), 1e-6)
+        assertEquals(-1.0, response.ownership.last(), 1e-6)
     }
 
     @Test

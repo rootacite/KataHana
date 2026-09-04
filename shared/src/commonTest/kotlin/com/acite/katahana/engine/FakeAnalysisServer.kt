@@ -11,6 +11,17 @@ object FakeAnalysisServer {
         val toPlay = if (turn % 2 == 0) "B" else "W"
         val winrate = if (toPlay == "B") 0.064430148 else 0.365329923
         val lead = if (toPlay == "B") -0.945011317 else -0.848749292
+        val n = query.boardXSize * query.boardYSize
+        val ownershipJson = if (query.includeOwnership && n > 0) {
+            val values = (0 until n).joinToString(",") { i ->
+                val t = if (n == 1) 0.0 else 1.0 - 2.0 * i / (n - 1)
+                (kotlin.math.round(t * 10000.0) / 10000.0).toString()
+            }
+            """,
+              "ownership": [$values]"""
+        } else {
+            ""
+        }
         return """
             {
               "id": "${query.id}",
@@ -33,7 +44,7 @@ object FakeAnalysisServer {
                   "move": "E5",
                   "order": 0,
                   "prior": 0.488737941,
-                  "pv": ["E5", "G5"],
+                  "pv": ["E5", "G5", "F6", "D6"],
                   "scoreLead": -0.886509664,
                   "visits": 6,
                   "winrate": 0.0666426835
@@ -65,7 +76,7 @@ object FakeAnalysisServer {
                   "visits": 1,
                   "winrate": 0.0454937462
                 }
-              ]
+              ]$ownershipJson
             }
         """.trimIndent()
     }

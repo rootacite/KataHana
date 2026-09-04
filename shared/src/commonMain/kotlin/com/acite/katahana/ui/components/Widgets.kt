@@ -13,8 +13,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -23,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.acite.katahana.ui.theme.HanaColors
@@ -149,5 +153,36 @@ fun ChoiceRow(modifier: Modifier = Modifier, content: @Composable RowScope.() ->
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
         content = content,
+    )
+}
+
+@Composable
+fun HanaField(
+    label: String,
+    value: String,
+    onChange: (String) -> Unit,
+    placeholder: String? = null,
+    keyboard: KeyboardType = KeyboardType.Text,
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onChange,
+        label = { Text(label) },
+        placeholder = placeholder?.let { { Text(it, color = HanaColors.textDim) } },
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(keyboardType = keyboard),
+        shape = hanaTokens.panel,
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor = HanaColors.accentPink,
+            unfocusedBorderColor = HanaColors.stroke,
+            focusedLabelColor = HanaColors.accentLilac,
+            unfocusedLabelColor = HanaColors.textDim,
+            focusedTextColor = HanaColors.text,
+            unfocusedTextColor = HanaColors.text,
+            cursorColor = HanaColors.accentPink,
+            focusedContainerColor = HanaColors.bgCard,
+            unfocusedContainerColor = HanaColors.bgCard,
+        ),
+        modifier = Modifier.fillMaxWidth(),
     )
 }

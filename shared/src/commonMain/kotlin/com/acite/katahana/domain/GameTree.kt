@@ -39,14 +39,28 @@ class GameTree(
     /** Off a leaf: remaining moves exist, so this is review rather than live play. */
     val reviewing: Boolean get() = canRedo
 
-    fun lineMoves(): List<Move> {
+    fun lineMoves(): List<Move> = pathMoves(current)
+
+    fun pathMoves(node: Node): List<Move> {
         val acc = ArrayDeque<Move>()
-        var node: Node? = current
-        while (node != null) {
-            node.move?.let { acc.addFirst(it) }
-            node = node.parent
+        var walk: Node? = node
+        while (walk != null) {
+            walk.move?.let { acc.addFirst(it) }
+            walk = walk.parent
         }
         return acc.toList()
+    }
+
+    /** Root → current → preferredChild leaf. Does not move [current]. */
+    fun preferredLine(): List<Node> {
+        val acc = nodesFromRoot().toMutableList()
+        var node = current
+        while (node.children.isNotEmpty()) {
+            val i = node.preferredChild.coerceIn(0, node.children.lastIndex)
+            node = node.children[i]
+            acc += node
+        }
+        return acc
     }
 
     fun play(point: Point): PlayResult {
@@ -125,6 +139,30 @@ class GameTree(
             node = node.parent
         }
         return acc.toList()
+    }
+
+    /** Child indices from root to [current], used to restore the viewing node. */
+    fun childPath(): List<Int> {
+        val acc = ArrayDeque<Int>()
+        var node = current
+        while (true) {
+            val parent = node.parent ?: break
+            val idx = parent.children.indexOf(node)
+            if (idx < 0) break
+            acc.addFirst(idx)
+            node = parent
+        }
+        return acc.toList()
+    }
+
+    fun applyChildPath(path: List<Int>): Boolean {
+        current = root
+        for (index in path) {
+            if (index !in current.children.indices) return false
+            current.preferredChild = index
+            current = current.children[index]
+        }
+        return true
     }
 
     fun variationIndex(): Int {

@@ -35,6 +35,46 @@ class PerspectiveTest {
         assertTrue(top.none { it.gtp.equals("pass", ignoreCase = true) })
         assertEquals(4, top[0].point?.x)
         assertEquals(4, top[0].point?.y)
+        assertEquals(listOf("E5", "G5", "F6", "D6"), top[0].pv)
+    }
+
+    @Test
+    fun ownershipIndexMatchesGtpTopLeftToBottomRight() {
+        assertEquals(0, ownershipIndex(Point.fromGtp("A19", 19)!!, 19))
+        assertEquals(18, ownershipIndex(Point.fromGtp("T19", 19)!!, 19))
+        assertEquals(360, ownershipIndex(Point.fromGtp("T1", 19)!!, 19))
+        assertEquals(0, ownershipIndex(Point.fromGtp("A9", 9)!!, 9))
+        assertEquals(80, ownershipIndex(Point.fromGtp("J1", 9)!!, 9))
+    }
+
+    @Test
+    fun heldOwnershipKeepsPreviousWhenIncomingEmpty() {
+        val previous = List(9) { 0.4 }
+        assertEquals(previous, heldOwnership(previous, emptyList(), 3))
+        assertEquals(emptyList(), heldOwnership(emptyList(), emptyList(), 3))
+        val incoming = List(9) { -0.2 }
+        assertEquals(incoming, heldOwnership(previous, incoming, 3))
+        assertEquals(emptyList(), heldOwnership(previous, emptyList(), 9))
+    }
+
+    @Test
+    fun lerpOwnershipBlendsCellwise() {
+        val from = floatArrayOf(0f, 1f, -1f)
+        val to = floatArrayOf(1f, -1f, 1f)
+        val mid = lerpOwnership(from, to, 0.5f)
+        assertEquals(0.5f, mid[0], 1e-5f)
+        assertEquals(0f, mid[1], 1e-5f)
+        assertEquals(0f, mid[2], 1e-5f)
+        assertEquals(1f, lerpOwnership(from, to, 1f)[0], 1e-5f)
+        assertEquals(0f, lerpOwnership(from, to, 0f)[0], 1e-5f)
+    }
+
+    @Test
+    fun formatPvTruncates() {
+        val pv = listOf("E5", "G5", "F6", "D6", "C5")
+        assertEquals("E5 G5 F6", formatPv(pv, limit = 3))
+        assertEquals("E5 G5 F6 D6 C5", formatPv(pv))
+        assertEquals("", formatPv(emptyList()))
     }
 
     @Test

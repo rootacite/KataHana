@@ -11,40 +11,44 @@ import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
 import com.acite.katahana.ai.QualityBand
 
-private val FaceInk = Color(0xFF1A1228)
-private val Tongue = Color(0xFFE85D7A)
-private val Thought = Color(0xFF3A3460)
-
 fun DrawScope.drawQualityFace(center: Offset, stoneRadius: Float, band: QualityBand) {
-    val r = stoneRadius * 0.70f
-    val fill = qualityDotColor(band)
-    drawCircle(color = fill, radius = r, center = center)
-    drawCircle(
-        color = Color(0xFF1A1228).copy(alpha = 0.35f),
-        radius = r,
-        center = center,
-        style = Stroke(width = (r * 0.07f).coerceAtLeast(1.2f)),
+    val r = stoneRadius * 0.96f
+    val cap = StrokeCap.Round
+    val join = StrokeJoin.Round
+    val colorW = (r * 0.18f).coerceAtLeast(2.6f)
+    val haloW = (colorW + r * 0.07f).coerceAtLeast(colorW + 2.2f)
+    val outline = FacePen(
+        color = Color.White,
+        stroke = Stroke(width = haloW, cap = cap, join = join),
+        pad = (haloW - colorW) * 0.5f,
+        fill = false,
     )
-    drawCircle(
-        color = Color.White.copy(alpha = 0.95f),
-        radius = r,
-        center = center,
-        style = Stroke(width = (r * 0.13f).coerceAtLeast(2f)),
+    val ink = FacePen(
+        color = qualityDotColor(band),
+        stroke = Stroke(width = colorW, cap = cap, join = join),
+        pad = 0f,
+        fill = true,
     )
-    val ink = FaceInk.copy(alpha = if (band == QualityBand.Shallow) 0.55f else 0.92f)
-    val stroke = Stroke(
-        width = (r * 0.11f).coerceAtLeast(1.6f),
-        cap = StrokeCap.Round,
-        join = StrokeJoin.Round,
-    )
+    paintFace(center, r, band, outline)
+    paintFace(center, r, band, ink)
+}
+
+private class FacePen(
+    val color: Color,
+    val stroke: Stroke,
+    val pad: Float,
+    val fill: Boolean,
+)
+
+private fun DrawScope.paintFace(center: Offset, r: Float, band: QualityBand, pen: FacePen) {
     when (band) {
-        QualityBand.Good -> drawHappyChevrons(center, r, ink, stroke)
-        QualityBand.Fair -> drawCaretSmile(center, r, ink, stroke)
-        QualityBand.Inaccuracy -> drawThinkFace(center, r, ink, stroke)
-        QualityBand.Mistake -> drawFlatFace(center, r, ink, stroke)
-        QualityBand.BigMistake -> drawUnamusedFace(center, r, ink, stroke)
-        QualityBand.Blunder -> drawSickFace(center, r, ink, stroke)
-        QualityBand.Shallow -> drawDottedFace(center, r, ink, stroke)
+        QualityBand.Good -> drawHappyChevrons(center, r, pen)
+        QualityBand.Fair -> drawCaretSmile(center, r, pen)
+        QualityBand.Inaccuracy -> drawThinkFace(center, r, pen)
+        QualityBand.Mistake -> drawFlatFace(center, r, pen)
+        QualityBand.BigMistake -> drawUnamusedFace(center, r, pen)
+        QualityBand.Blunder -> drawSickFace(center, r, pen)
+        QualityBand.Shallow -> drawDottedFace(center, r, pen)
     }
 }
 
@@ -58,80 +62,93 @@ private fun DrawScope.seg(
     y1: Float,
     x2: Float,
     y2: Float,
-    color: Color,
-    stroke: Stroke,
+    pen: FacePen,
 ) {
     drawLine(
-        color = color,
+        color = pen.color,
         start = pt(c, r, x1, y1),
         end = pt(c, r, x2, y2),
-        strokeWidth = stroke.width,
-        cap = stroke.cap,
+        strokeWidth = pen.stroke.width,
+        cap = pen.stroke.cap,
     )
 }
 
+private fun DrawScope.dot(
+    c: Offset,
+    r: Float,
+    x: Float,
+    y: Float,
+    pen: FacePen,
+    radius: Float,
+    alpha: Float = 1f,
+) {
+    drawCircle(pen.color.copy(alpha = alpha), radius + pen.pad, pt(c, r, x, y))
+}
+
 /** >v< */
-private fun DrawScope.drawHappyChevrons(c: Offset, r: Float, ink: Color, stroke: Stroke) {
-    seg(c, r, -0.46f, -0.30f, -0.22f, -0.10f, ink, stroke)
-    seg(c, r, -0.22f, -0.10f, -0.46f, 0.10f, ink, stroke)
-    seg(c, r, 0.46f, -0.30f, 0.22f, -0.10f, ink, stroke)
-    seg(c, r, 0.22f, -0.10f, 0.46f, 0.10f, ink, stroke)
-    seg(c, r, -0.20f, 0.28f, 0f, 0.46f, ink, stroke)
-    seg(c, r, 0f, 0.46f, 0.20f, 0.28f, ink, stroke)
+private fun DrawScope.drawHappyChevrons(c: Offset, r: Float, pen: FacePen) {
+    seg(c, r, -0.46f, -0.30f, -0.22f, -0.10f, pen)
+    seg(c, r, -0.22f, -0.10f, -0.46f, 0.10f, pen)
+    seg(c, r, 0.46f, -0.30f, 0.22f, -0.10f, pen)
+    seg(c, r, 0.22f, -0.10f, 0.46f, 0.10f, pen)
+    seg(c, r, -0.20f, 0.28f, 0f, 0.46f, pen)
+    seg(c, r, 0f, 0.46f, 0.20f, 0.28f, pen)
 }
 
 /** ^_^ */
-private fun DrawScope.drawCaretSmile(c: Offset, r: Float, ink: Color, stroke: Stroke) {
-    seg(c, r, -0.42f, -0.04f, -0.28f, -0.28f, ink, stroke)
-    seg(c, r, -0.28f, -0.28f, -0.14f, -0.04f, ink, stroke)
-    seg(c, r, 0.14f, -0.04f, 0.28f, -0.28f, ink, stroke)
-    seg(c, r, 0.28f, -0.28f, 0.42f, -0.04f, ink, stroke)
-    seg(c, r, -0.16f, 0.30f, 0.16f, 0.30f, ink, stroke)
+private fun DrawScope.drawCaretSmile(c: Offset, r: Float, pen: FacePen) {
+    seg(c, r, -0.42f, -0.04f, -0.28f, -0.28f, pen)
+    seg(c, r, -0.28f, -0.28f, -0.14f, -0.04f, pen)
+    seg(c, r, 0.14f, -0.04f, 0.28f, -0.28f, pen)
+    seg(c, r, 0.28f, -0.28f, 0.42f, -0.04f, pen)
+    seg(c, r, -0.16f, 0.30f, 0.16f, 0.30f, pen)
 }
 
 /** thinking: offset gaze + thought bubbles */
-private fun DrawScope.drawThinkFace(c: Offset, r: Float, ink: Color, stroke: Stroke) {
-    drawCircle(ink, r * 0.09f, pt(c, r, -0.22f, -0.10f))
-    drawCircle(ink, r * 0.09f, pt(c, r, 0.18f, -0.20f))
+private fun DrawScope.drawThinkFace(c: Offset, r: Float, pen: FacePen) {
+    dot(c, r, -0.22f, -0.10f, pen, r * 0.09f)
+    dot(c, r, 0.18f, -0.20f, pen, r * 0.09f)
     val mouth = Path().apply {
         moveTo(pt(c, r, -0.12f, 0.28f).x, pt(c, r, -0.12f, 0.28f).y)
         quadraticTo(pt(c, r, 0.04f, 0.40f).x, pt(c, r, 0.04f, 0.40f).y, pt(c, r, 0.20f, 0.26f).x, pt(c, r, 0.20f, 0.26f).y)
     }
-    drawPath(mouth, ink, style = stroke)
-    drawCircle(Thought.copy(alpha = 0.55f), r * 0.07f, pt(c, r, 0.52f, -0.38f))
-    drawCircle(Thought.copy(alpha = 0.70f), r * 0.10f, pt(c, r, 0.68f, -0.58f))
-    drawCircle(Thought.copy(alpha = 0.85f), r * 0.14f, pt(c, r, 0.86f, -0.82f))
+    drawPath(mouth, pen.color, style = pen.stroke)
+    dot(c, r, 0.52f, -0.38f, pen, r * 0.07f, 0.55f)
+    dot(c, r, 0.68f, -0.58f, pen, r * 0.10f, 0.70f)
+    dot(c, r, 0.86f, -0.82f, pen, r * 0.14f, 0.85f)
 }
 
 /** -_- */
-private fun DrawScope.drawFlatFace(c: Offset, r: Float, ink: Color, stroke: Stroke) {
-    seg(c, r, -0.42f, -0.12f, -0.16f, -0.12f, ink, stroke)
-    seg(c, r, 0.16f, -0.12f, 0.42f, -0.12f, ink, stroke)
-    seg(c, r, -0.18f, 0.30f, 0.18f, 0.30f, ink, stroke)
+private fun DrawScope.drawFlatFace(c: Offset, r: Float, pen: FacePen) {
+    seg(c, r, -0.42f, -0.12f, -0.16f, -0.12f, pen)
+    seg(c, r, 0.16f, -0.12f, 0.42f, -0.12f, pen)
+    seg(c, r, -0.18f, 0.30f, 0.18f, 0.30f, pen)
 }
 
 /** unamused: heavy lids + frown */
-private fun DrawScope.drawUnamusedFace(c: Offset, r: Float, ink: Color, stroke: Stroke) {
-    seg(c, r, -0.44f, -0.18f, -0.14f, -0.10f, ink, stroke)
-    seg(c, r, 0.14f, -0.10f, 0.44f, -0.18f, ink, stroke)
-    drawCircle(ink, r * 0.055f, pt(c, r, -0.28f, -0.02f))
-    drawCircle(ink, r * 0.055f, pt(c, r, 0.28f, -0.02f))
+private fun DrawScope.drawUnamusedFace(c: Offset, r: Float, pen: FacePen) {
+    seg(c, r, -0.44f, -0.18f, -0.14f, -0.10f, pen)
+    seg(c, r, 0.14f, -0.10f, 0.44f, -0.18f, pen)
+    dot(c, r, -0.28f, -0.02f, pen, r * 0.055f)
+    dot(c, r, 0.28f, -0.02f, pen, r * 0.055f)
     val frown = Path().apply {
         moveTo(pt(c, r, -0.20f, 0.36f).x, pt(c, r, -0.20f, 0.36f).y)
         quadraticTo(pt(c, r, 0f, 0.18f).x, pt(c, r, 0f, 0.18f).y, pt(c, r, 0.20f, 0.36f).x, pt(c, r, 0.20f, 0.36f).y)
     }
-    drawPath(frown, ink, style = stroke)
+    drawPath(frown, pen.color, style = pen.stroke)
 }
 
 /** sick: X eyes, open mouth, tongue */
-private fun DrawScope.drawSickFace(c: Offset, r: Float, ink: Color, stroke: Stroke) {
-    seg(c, r, -0.40f, -0.28f, -0.16f, -0.04f, ink, stroke)
-    seg(c, r, -0.40f, -0.04f, -0.16f, -0.28f, ink, stroke)
-    seg(c, r, 0.16f, -0.28f, 0.40f, -0.04f, ink, stroke)
-    seg(c, r, 0.16f, -0.04f, 0.40f, -0.28f, ink, stroke)
+private fun DrawScope.drawSickFace(c: Offset, r: Float, pen: FacePen) {
+    seg(c, r, -0.40f, -0.28f, -0.16f, -0.04f, pen)
+    seg(c, r, -0.40f, -0.04f, -0.16f, -0.28f, pen)
+    seg(c, r, 0.16f, -0.28f, 0.40f, -0.04f, pen)
+    seg(c, r, 0.16f, -0.04f, 0.40f, -0.28f, pen)
     val mouth = Rect(pt(c, r, -0.22f, 0.10f), pt(c, r, 0.22f, 0.42f))
-    drawOval(ink.copy(alpha = 0.18f), topLeft = mouth.topLeft, size = mouth.size)
-    drawOval(ink, topLeft = mouth.topLeft, size = mouth.size, style = stroke)
+    if (pen.fill) {
+        drawOval(pen.color.copy(alpha = 0.18f), topLeft = mouth.topLeft, size = mouth.size)
+    }
+    drawOval(pen.color, topLeft = mouth.topLeft, size = mouth.size, style = pen.stroke)
     val tongue = Path().apply {
         val a = pt(c, r, -0.10f, 0.32f)
         val b = pt(c, r, 0.10f, 0.32f)
@@ -140,17 +157,19 @@ private fun DrawScope.drawSickFace(c: Offset, r: Float, ink: Color, stroke: Stro
         quadraticTo(tip.x, tip.y, b.x, b.y)
         close()
     }
-    drawPath(tongue, Tongue, style = Fill)
-    drawPath(tongue, ink, style = stroke)
+    if (pen.fill) {
+        drawPath(tongue, pen.color.copy(alpha = 0.85f), style = Fill)
+    }
+    drawPath(tongue, pen.color, style = pen.stroke)
 }
 
-private fun DrawScope.drawDottedFace(c: Offset, r: Float, ink: Color, stroke: Stroke) {
-    drawCircle(ink, r * 0.08f, pt(c, r, -0.22f, -0.10f))
-    drawCircle(ink, r * 0.08f, pt(c, r, 0.22f, -0.10f))
+private fun DrawScope.drawDottedFace(c: Offset, r: Float, pen: FacePen) {
+    dot(c, r, -0.22f, -0.10f, pen, r * 0.08f)
+    dot(c, r, 0.22f, -0.10f, pen, r * 0.08f)
     val wave = Path().apply {
         moveTo(pt(c, r, -0.22f, 0.28f).x, pt(c, r, -0.22f, 0.28f).y)
         quadraticTo(pt(c, r, -0.08f, 0.18f).x, pt(c, r, -0.08f, 0.18f).y, pt(c, r, 0f, 0.28f).x, pt(c, r, 0f, 0.28f).y)
         quadraticTo(pt(c, r, 0.08f, 0.38f).x, pt(c, r, 0.08f, 0.38f).y, pt(c, r, 0.22f, 0.28f).x, pt(c, r, 0.22f, 0.28f).y)
     }
-    drawPath(wave, ink, style = stroke)
+    drawPath(wave, pen.color, style = pen.stroke)
 }

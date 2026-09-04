@@ -11,6 +11,7 @@ import com.acite.katahana.domain.AiStyle
 import com.acite.katahana.domain.GameConfig
 import com.acite.katahana.domain.GameSession
 import com.acite.katahana.domain.GameTree
+import com.acite.katahana.domain.Node
 import com.acite.katahana.domain.Move
 import com.acite.katahana.domain.PlayMode
 import com.acite.katahana.domain.PlayResult
@@ -27,7 +28,16 @@ import com.acite.katahana.engine.AnalysisResponse
 import com.acite.katahana.engine.LiveAnalysis
 import com.acite.katahana.engine.MoveInfo
 import com.acite.katahana.engine.pointsLost
+import com.acite.katahana.engine.heldOwnership
+import com.acite.katahana.engine.selectCandidates
 import com.acite.katahana.engine.toBlackView
+import com.acite.katahana.epochMillis
+import com.acite.katahana.recents.RecentGame
+import com.acite.katahana.recents.RecentGamesRepository
+import com.acite.katahana.recents.defaultRecentTitle
+import com.acite.katahana.recents.toRecentAiStyle
+import com.acite.katahana.recents.toRecentMode
+import com.acite.katahana.settings.OwnershipStyle
 import com.acite.katahana.settings.QualityThresholds
 import com.acite.katahana.settings.SettingsRepository
 import com.acite.katahana.sgf.writeSgf
@@ -41,6 +51,7 @@ import dev.zacsweers.metrox.viewmodel.ManualViewModelAssistedFactoryKey
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.random.Random
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -63,29 +74,56 @@ data class SessionUiState(
     val aiError: String? = null,
     val qualities: List<QualityMark> = emptyList(),
     val tree: TreeLayout = TreeLayout(emptyList(), "", 0, 0),
+    val ownership: List<Double> = emptyList(),
+    val reviewProgress: ReviewProgress? = null,
+    val dirty: Boolean = false,
+    val canSave: Boolean = false,
 ) {
     val preview: Point? get() = selected ?: hover
 }
 
+enum class SaveOutcome {
+    Saved,
+    NeedsName,
+    Failed,
+}
+
+data class ReviewProgress(
+    val done: Int,
+    val total: Int,
+    val running: Boolean,
+)
+
 private data class StoredEval(
+    val blackWinrate: Double,
     val blackScoreLead: Double,
     val visits: Int,
     val moveInfos: List<MoveInfo>,
     val toPlay: StoneColor,
+    val ownership: List<Double> = emptyList(),
 )
 
 @AssistedInject
 class SessionViewModel(
     @Assisted val config: GameConfig,
     @Assisted val loadedTree: GameTree?,
+    @Assisted private val recentId: String?,
+    @Assisted private val recentTitle: String?,
     private val settings: SettingsRepository,
     private val analysis: AnalysisClient,
+    private val recents: RecentGamesRepository,
 ) : ViewModel() {
     private val session = GameSession(config, loadedTree)
     private val sessionId = Random.nextLong().toULong().toString(16)
     private val nodeEvals = mutableMapOf<String, StoredEval>()
     private var aiJob: Job? = null
+    private var reviewJob: Job? = null
     private var navEpoch = 0
+    private var boundId: String? = recentId
+    private var boundTitle: String = recentTitle?.takeIf { it.isNotBlank() } ?: defaultRecentTitle(config)
+    private var boundCreatedAt: Long? = null
+    private var savedSgf: String? = null
+    private var savedPath: List<Int>? = null
 
     val confirmMove: StateFlow<Boolean> = settings.confirmMove.stateIn(
         viewModelScope,
@@ -112,6 +150,16 @@ class SessionViewModel(
         SharingStarted.WhileSubscribed(1_000),
         false,
     )
+    val showOwnership: StateFlow<Boolean> = settings.showOwnership.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(1_000),
+        false,
+    )
+    val ownershipStyle: StateFlow<OwnershipStyle> = settings.ownershipStyle.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(1_000),
+        OwnershipStyle.Default,
+    )
     val quality: StateFlow<QualityThresholds> = settings.quality.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(1_000),
@@ -130,6 +178,10 @@ class SessionViewModel(
         viewModelScope.launch { settings.setShowConnections(value) }
     }
 
+    fun setShowOwnership(value: Boolean) {
+        viewModelScope.launch { settings.setShowOwnership(value) }
+    }
+
     fun setShowCoords(value: Boolean) {
         viewModelScope.launch { settings.setShowCoords(value) }
     }
@@ -144,6 +196,14 @@ class SessionViewModel(
     val state: StateFlow<SessionUiState> = _state.asStateFlow()
 
     init {
+        if (boundId != null) {
+            savedSgf = sgfText()
+            savedPath = session.tree.childPath()
+            val existing = recents.games.value.find { it.id == boundId }
+            boundCreatedAt = existing?.createdAt
+            if (existing != null && boundTitle.isBlank()) boundTitle = existing.title
+        }
+        refreshSaveFlags()
         viewModelScope.launch {
             analysis.status.collect { status ->
                 val becameOnline = status.online && !_state.value.engineStatus.online
@@ -170,6 +230,11 @@ class SessionViewModel(
                         candidates = live.candidates,
                         analyzing = live.isDuringSearch,
                         qualities = refreshQualities(),
+                        ownership = heldOwnership(
+                            it.ownership,
+                            live.ownership,
+                            session.tree.size,
+                        ),
                     )
                 }
             }
@@ -204,6 +269,7 @@ class SessionViewModel(
 
     fun pass() {
         if (isAiToPlay()) return
+        cancelReviewQueue()
         snapshotLiveToCurrentNode()
         if (session.pass() is PlayResult.Ok) publish()
     }
@@ -237,6 +303,63 @@ class SessionViewModel(
 
     fun sgfFileName(): String = "katahana-${session.tree.size}x${session.tree.size}.sgf"
 
+    fun suggestedTitle(): String = boundTitle
+
+    suspend fun save(): SaveOutcome {
+        val id = boundId ?: return SaveOutcome.NeedsName
+        return writeRecent(id, boundTitle, newCopy = false)
+    }
+
+    suspend fun saveAs(name: String): SaveOutcome {
+        val title = name.trim().ifBlank { defaultRecentTitle(config) }
+        return writeRecent(newRecentId(), title, newCopy = true)
+    }
+
+    private suspend fun writeRecent(id: String, title: String, newCopy: Boolean): SaveOutcome {
+        val now = epochMillis()
+        val created = if (newCopy) now else (boundCreatedAt ?: now)
+        val game = RecentGame(
+            id = id,
+            title = title,
+            savedAt = now,
+            createdAt = created,
+            moveNumber = session.tree.current.moveNumber,
+            boardSize = config.boardSize,
+            komi = config.komi,
+            mode = config.toRecentMode(),
+            rankKyu = config.rankKyu,
+            humanPlaysBlack = config.humanPlaysBlack,
+            aiStyle = config.toRecentAiStyle(),
+            sgf = sgfText(),
+            currentPath = session.tree.childPath(),
+        )
+        return runCatching {
+            recents.upsert(game)
+            boundId = id
+            boundTitle = title
+            boundCreatedAt = created
+            savedSgf = game.sgf
+            savedPath = game.currentPath
+            refreshSaveFlags()
+            SaveOutcome.Saved
+        }.getOrElse { SaveOutcome.Failed }
+    }
+
+    private fun newRecentId(): String = Random.nextLong().toULong().toString(16)
+
+    private fun hasContent(): Boolean = session.tree.root.children.isNotEmpty()
+
+    private fun computeDirty(): Boolean {
+        if (boundId == null) return hasContent()
+        return sgfText() != savedSgf || session.tree.childPath() != savedPath
+    }
+
+    private fun refreshSaveFlags() {
+        _state.update {
+            it.copy(dirty = computeDirty(), canSave = boundId != null || hasContent())
+        }
+    }
+
     private fun aiPlayerName(): String = when {
         config.mode != PlayMode.HumanVsAi -> "White"
         config.aiStyle == AiStyle.Full -> "KataHana Full"
@@ -244,21 +367,31 @@ class SessionViewModel(
     }
 
     private fun commit(point: Point) {
+        cancelReviewQueue()
         snapshotLiveToCurrentNode()
         if (session.play(point) is PlayResult.Ok) publish()
     }
 
     private fun publish() {
+        val eval = nodeEvals[session.tree.current.id]
         _state.update {
             it.copy(
                 snapshot = session.snapshot(),
                 selected = null,
                 hover = null,
-                candidates = emptyList(),
+                candidates = eval?.let { stored ->
+                    selectCandidates(stored.moveInfos, session.tree.size, stored.toPlay)
+                } ?: emptyList(),
+                blackWinrate = eval?.blackWinrate,
+                blackScoreLead = eval?.blackScoreLead,
+                visits = eval?.visits ?: 0,
+                ownership = heldOwnership(it.ownership, eval?.ownership ?: emptyList(), session.tree.size),
                 aiThinking = false,
                 aiError = null,
                 qualities = refreshQualities(),
                 tree = session.tree.layout(),
+                dirty = computeDirty(),
+                canSave = boundId != null || hasContent(),
             )
         }
         afterPositionChange()
@@ -266,8 +399,9 @@ class SessionViewModel(
 
     private fun afterPositionChange() {
         if (isAiToPlay() && analysis.status.value.online) {
+            cancelReviewQueue()
             playAi()
-        } else if (!isAiToPlay()) {
+        } else if (!isAiToPlay() && !reviewRunning()) {
             requestLive()
         }
     }
@@ -279,6 +413,7 @@ class SessionViewModel(
 
     private fun playAi() {
         val epoch = navEpoch
+        cancelReviewQueue()
         aiJob?.cancel()
         aiJob = viewModelScope.launch {
             _state.update { it.copy(aiThinking = true, aiError = null) }
@@ -338,17 +473,23 @@ class SessionViewModel(
         rememberEval(
             live.nodeId,
             StoredEval(
+                blackWinrate = live.blackWinrate,
                 blackScoreLead = live.blackScoreLead,
                 visits = live.visits,
                 moveInfos = live.moveInfos,
                 toPlay = live.toPlay,
+                ownership = live.ownership,
             ),
         )
     }
 
     private fun rememberEval(nodeId: String, eval: StoredEval) {
-        val prev = nodeEvals[nodeId]
-        if (prev != null && prev.visits > eval.visits) return
+        val prev = nodeEvals[nodeId] ?: run {
+            nodeEvals[nodeId] = eval
+            return
+        }
+        if (prev.visits > eval.visits) return
+        if (prev.visits == eval.visits && prev.ownership.isNotEmpty() && eval.ownership.isEmpty()) return
         nodeEvals[nodeId] = eval
     }
 
@@ -358,12 +499,88 @@ class SessionViewModel(
         rememberEval(
             nodeId,
             StoredEval(
+                blackWinrate = view.winrate,
                 blackScoreLead = view.scoreLead,
                 visits = root?.visits ?: 0,
                 moveInfos = response.moveInfos,
                 toPlay = toPlay,
+                ownership = response.ownership,
             ),
         )
+    }
+
+    fun analyzeGame() {
+        if (reviewRunning()) {
+            cancelReviewQueue()
+            return
+        }
+        if (!analysis.status.value.online) return
+        reviewJob = viewModelScope.launch {
+            val visitsNeeded = settings.reviewVisits.first()
+            val size = session.tree.size
+            val line = session.tree.preferredLine()
+            val pending = line.filter { node -> needsReview(node, visitsNeeded, size) }
+            if (pending.isEmpty()) {
+                _state.update { it.copy(reviewProgress = ReviewProgress(line.size, line.size, false)) }
+                return@launch
+            }
+            _state.update { it.copy(reviewProgress = ReviewProgress(0, pending.size, true)) }
+            try {
+                pending.forEachIndexed { index, node ->
+                    val response = analysis.queryReview(sessionId, session.tree, node)
+                    storeEval(node.id, response, node.position.toPlay)
+                    val eval = nodeEvals[node.id]
+                    val isCurrent = session.tree.current.id == node.id
+                    _state.update { state ->
+                        state.copy(
+                            reviewProgress = ReviewProgress(index + 1, pending.size, true),
+                            qualities = refreshQualities(),
+                            blackWinrate = if (isCurrent) eval?.blackWinrate else state.blackWinrate,
+                            blackScoreLead = if (isCurrent) eval?.blackScoreLead else state.blackScoreLead,
+                            visits = if (isCurrent) eval?.visits ?: state.visits else state.visits,
+                            candidates = if (isCurrent && eval != null) {
+                                selectCandidates(eval.moveInfos, size, eval.toPlay)
+                            } else {
+                                state.candidates
+                            },
+                            ownership = if (isCurrent) {
+                                heldOwnership(state.ownership, eval?.ownership ?: emptyList(), size)
+                            } else {
+                                state.ownership
+                            },
+                        )
+                    }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _state.update {
+                    it.copy(
+                        reviewProgress = it.reviewProgress?.copy(running = false),
+                        aiError = e.message?.take(160),
+                    )
+                }
+                return@launch
+            }
+            _state.update { it.copy(reviewProgress = it.reviewProgress?.copy(running = false)) }
+            if (!isAiToPlay()) requestLive()
+        }
+    }
+
+    private fun needsReview(node: Node, visitsNeeded: Int, size: Int): Boolean {
+        val eval = nodeEvals[node.id] ?: return true
+        if (eval.visits < visitsNeeded) return true
+        return eval.ownership.size != size * size
+    }
+
+    private fun reviewRunning(): Boolean = reviewJob?.isActive == true
+
+    private fun cancelReviewQueue() {
+        val job = reviewJob ?: return
+        reviewJob = null
+        analysis.cancelLive(sessionId)
+        job.cancel()
+        _state.update { it.copy(reviewProgress = it.reviewProgress?.copy(running = false)) }
     }
 
     private fun refreshQualities(): List<QualityMark> {
@@ -402,6 +619,7 @@ class SessionViewModel(
     fun leave() {
         navEpoch++
         aiJob?.cancel()
+        cancelReviewQueue()
         analysis.cancelLive(sessionId)
     }
 
@@ -414,6 +632,11 @@ class SessionViewModel(
     @ManualViewModelAssistedFactoryKey
     @ContributesIntoMap(AppScope::class)
     interface Factory : ManualViewModelAssistedFactory {
-        fun create(config: GameConfig, loadedTree: GameTree?): SessionViewModel
+        fun create(
+            config: GameConfig,
+            loadedTree: GameTree?,
+            recentId: String?,
+            recentTitle: String?,
+        ): SessionViewModel
     }
 }

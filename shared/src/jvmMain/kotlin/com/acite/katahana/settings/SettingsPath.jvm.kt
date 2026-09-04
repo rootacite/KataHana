@@ -2,8 +2,10 @@ package com.acite.katahana.settings
 
 import java.io.File
 
-actual fun settingsFilePath(): String {
+actual fun appDir(): String {
     val dir = File(System.getProperty("user.home"), ".katahana")
     dir.mkdirs()
-    return File(dir, SETTINGS_FILE).absolutePath
+    return dir.absolutePath
 }
+
+actual fun settingsFilePath(): String = File(appDir(), SETTINGS_FILE).absolutePath

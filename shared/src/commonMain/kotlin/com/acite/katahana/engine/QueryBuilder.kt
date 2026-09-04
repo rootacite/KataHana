@@ -4,6 +4,8 @@ import com.acite.katahana.domain.GameTree
 import com.acite.katahana.domain.Move
 import com.acite.katahana.domain.StoneColor
 
+const val ANALYSIS_PV_LEN = 12
+
 fun StoneColor.toGtp(): String = if (this == StoneColor.Black) "B" else "W"
 
 fun Move.toGtpPair(boardSize: Int): List<String> = when (this) {
@@ -29,9 +31,36 @@ fun buildLiveQuery(
         moves = moves,
         analyzeTurns = listOf(moves.size),
         maxVisits = maxVisits,
-        includeOwnership = false,
+        includeOwnership = true,
         includePolicy = false,
         reportDuringSearchEvery = reportEverySeconds,
+        analysisPVLen = ANALYSIS_PV_LEN,
+    )
+}
+
+fun buildReviewQuery(
+    sessionId: String,
+    nodeId: String,
+    nonce: String,
+    tree: GameTree,
+    moves: List<Move>,
+    maxVisits: Int,
+    reportEverySeconds: Double? = 0.4,
+): AnalysisQuery {
+    val gtpMoves = moves.map { it.toGtpPair(tree.size) }
+    return AnalysisQuery(
+        id = "$sessionId:$nodeId:review:$nonce",
+        rules = tree.rules,
+        komi = tree.komi.toDouble(),
+        boardXSize = tree.size,
+        boardYSize = tree.size,
+        moves = gtpMoves,
+        analyzeTurns = listOf(gtpMoves.size),
+        maxVisits = maxVisits,
+        includeOwnership = true,
+        includePolicy = false,
+        reportDuringSearchEvery = reportEverySeconds,
+        analysisPVLen = ANALYSIS_PV_LEN,
     )
 }
 

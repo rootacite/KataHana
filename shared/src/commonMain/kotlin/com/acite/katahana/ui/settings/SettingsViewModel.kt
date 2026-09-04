@@ -7,6 +7,7 @@ import com.acite.katahana.engine.EngineProfile
 import com.acite.katahana.engine.EngineStatus
 import com.acite.katahana.engine.TestResult
 import com.acite.katahana.domain.GameConfig
+import com.acite.katahana.settings.OwnershipStyle
 import com.acite.katahana.settings.QualityThresholds
 import com.acite.katahana.settings.SettingsRepository
 import com.acite.katahana.ui.Copy
@@ -37,6 +38,9 @@ class SettingsViewModel(
     )
     val appearanceId: StateFlow<String> = repo.appearanceId.stateIn(
         viewModelScope, SharingStarted.WhileSubscribed(1_000), Appearance.DEFAULT_ID,
+    )
+    val ownershipStyle: StateFlow<OwnershipStyle> = repo.ownershipStyle.stateIn(
+        viewModelScope, SharingStarted.WhileSubscribed(1_000), OwnershipStyle.Default,
     )
     val engineName: StateFlow<String> = repo.engineName.stateIn(
         viewModelScope, SharingStarted.WhileSubscribed(1_000), "KataGo",
@@ -70,6 +74,7 @@ class SettingsViewModel(
     fun setConfirmMove(value: Boolean) = launch { repo.setConfirmMove(value) }
     fun setShowCoords(value: Boolean) = launch { repo.setShowCoords(value) }
     fun setAppearanceId(value: String) = launch { repo.setAppearanceId(value) }
+    fun setOwnershipStyle(value: OwnershipStyle) = launch { repo.setOwnershipStyle(value) }
     fun setEngineName(value: String) = launch { repo.setEngineName(value) }
     fun setEngineUrl(value: String) = launch { repo.setEngineUrl(value) }
     fun setEngineToken(value: String) = launch { repo.setEngineToken(value) }
