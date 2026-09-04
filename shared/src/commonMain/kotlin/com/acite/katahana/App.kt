@@ -9,13 +9,16 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.backhandler.BackHandler
 import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import cafe.adriel.voyager.navigator.Navigator
 import cafe.adriel.voyager.transitions.FadeTransition
 import com.acite.katahana.ui.home.HomeScreen
+import com.acite.katahana.ui.navigation.ProvideHanaScreenLifecycle
 import com.acite.katahana.ui.settings.SettingsViewModel
 import com.acite.katahana.ui.theme.Appearance
 import com.acite.katahana.ui.theme.HanaColors
@@ -24,16 +27,22 @@ import dev.zacsweers.metrox.viewmodel.LocalMetroViewModelFactory
 import dev.zacsweers.metrox.viewmodel.MetroViewModelFactory
 import dev.zacsweers.metrox.viewmodel.metroViewModel
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun App(metroVmf: MetroViewModelFactory) {
     CompositionLocalProvider(LocalMetroViewModelFactory provides metroVmf) {
         ProvideViewModelStore {
-            val settings = metroViewModel<SettingsViewModel>()
-            val appearanceId by settings.appearanceId.collectAsState()
-            KataHanaTheme(appearance = Appearance.byId(appearanceId)) {
-                Box(Modifier.fillMaxSize().background(HanaColors.bgApp)) {
-                    Navigator(HomeScreen()) { navigator ->
-                        FadeTransition(navigator)
+            ProvideHanaScreenLifecycle {
+                val settings = metroViewModel<SettingsViewModel>()
+                val appearanceId by settings.appearanceId.collectAsState()
+                KataHanaTheme(appearance = Appearance.byId(appearanceId)) {
+                    Box(Modifier.fillMaxSize().background(HanaColors.bgApp)) {
+                        Navigator(HomeScreen(), onBackPressed = null) { navigator ->
+                            BackHandler(enabled = navigator.canPop) {
+                                navigator.pop()
+                            }
+                            FadeTransition(navigator)
+                        }
                     }
                 }
             }
