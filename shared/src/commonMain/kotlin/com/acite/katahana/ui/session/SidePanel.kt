@@ -1,0 +1,307 @@
+package com.acite.katahana.ui.session
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.acite.katahana.domain.AiStyle
+import com.acite.katahana.domain.PlayMode
+import com.acite.katahana.domain.SessionSnapshot
+import com.acite.katahana.domain.StoneColor
+import com.acite.katahana.domain.TreeLayout
+import com.acite.katahana.domain.rankLabel
+import com.acite.katahana.engine.Candidate
+import com.acite.katahana.engine.formatScoreLoss
+import com.acite.katahana.ui.Copy
+import com.acite.katahana.ui.components.CapsuleButton
+import com.acite.katahana.ui.components.QuietTextButton
+import com.acite.katahana.ui.theme.HanaColors
+import com.acite.katahana.ui.theme.hanaAppearance
+import com.acite.katahana.ui.theme.hanaTokens
+
+@Composable
+fun SidePanel(
+    snapshot: SessionSnapshot,
+    hasSelection: Boolean,
+    onPass: () -> Unit,
+    onUndo: () -> Unit,
+    onRedo: () -> Unit,
+    onConfirm: () -> Unit,
+    modifier: Modifier = Modifier,
+    engineOnline: Boolean = false,
+    analyzing: Boolean = false,
+    candidates: List<Candidate> = emptyList(),
+    showCandidates: Boolean = true,
+    onShowCandidatesChange: (Boolean) -> Unit = {},
+    showQuality: Boolean = true,
+    onShowQualityChange: (Boolean) -> Unit = {},
+    aiThinking: Boolean = false,
+    aiError: String? = null,
+    onCycleVariation: (Int) -> Unit = {},
+    onGoToNode: (String) -> Unit = {},
+    tree: TreeLayout? = null,
+    onSaveSgf: () -> Unit = {},
+    showConnections: Boolean = false,
+    onShowConnectionsChange: (Boolean) -> Unit = {},
+    showCoords: Boolean = true,
+    onShowCoordsChange: (Boolean) -> Unit = {},
+    onBack: (() -> Unit)? = null,
+    onSettings: (() -> Unit)? = null,
+) {
+    val tokens = hanaTokens
+    Column(
+        modifier = modifier
+            .clip(tokens.card)
+            .background(HanaColors.bgPanel)
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        if (onBack != null || onSettings != null) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (onBack != null) QuietTextButton(Copy.back, onClick = onBack)
+                if (onSettings != null) QuietTextButton(Copy.settings, onClick = onSettings)
+            }
+        }
+        StatusCard(snapshot)
+        if (snapshot.mode == PlayMode.HumanVsAi) {
+            val aiLine = when {
+                snapshot.ended -> null
+                snapshot.reviewing -> null
+                aiThinking -> Copy.aiThinking
+                !engineOnline -> Copy.aiOffline
+                aiError != null -> aiError
+                else -> null
+            }
+            if (aiLine != null) {
+                Text(aiLine, color = HanaColors.accentLilac, fontSize = 13.sp)
+            }
+        }
+        if (snapshot.ended) {
+            Text(Copy.twoPasses, color = HanaColors.accentPink, fontSize = 14.sp)
+        }
+        val humanTurn = !aiThinking && !snapshot.ended && !snapshot.aiToPlay
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            CapsuleButton(Copy.pass, onPass, modifier = Modifier.weight(1f), enabled = humanTurn)
+            CapsuleButton(Copy.undo, onUndo, modifier = Modifier.weight(1f), enabled = snapshot.canUndo)
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            CapsuleButton(Copy.redo, onRedo, modifier = Modifier.weight(1f), enabled = snapshot.canRedo)
+            if (hasSelection) {
+                CapsuleButton(
+                    Copy.confirm,
+                    onConfirm,
+                    modifier = Modifier.weight(1f),
+                    emphasized = true,
+                    enabled = humanTurn,
+                )
+            }
+        }
+        if (snapshot.variationCount > 1) {
+            VariationRow(snapshot.variationIndex, snapshot.variationCount, onCycleVariation)
+        }
+        if (tree != null) {
+            GameTreeCard(
+                layout = tree,
+                reviewing = snapshot.reviewing,
+                onGoToNode = onGoToNode,
+                compact = false,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        ToggleCard(
+            label = Copy.showCandidates,
+            checked = showCandidates,
+            onChange = onShowCandidatesChange,
+        )
+        ToggleCard(
+            label = Copy.showDots,
+            checked = showQuality,
+            onChange = onShowQualityChange,
+        )
+        ToggleCard(
+            label = Copy.connections,
+            checked = showConnections,
+            onChange = onShowConnectionsChange,
+        )
+        ToggleCard(
+            label = Copy.showCoords,
+            checked = showCoords,
+            onChange = onShowCoordsChange,
+        )
+        CandidatesCard(
+            engineOnline = engineOnline,
+            analyzing = analyzing,
+            candidates = candidates,
+            showCandidates = showCandidates,
+        )
+        CapsuleButton(Copy.saveSgf, onSaveSgf, modifier = Modifier.fillMaxWidth())
+    }
+}
+
+@Composable
+private fun ToggleCard(
+    label: String,
+    checked: Boolean,
+    onChange: (Boolean) -> Unit,
+) {
+    val tokens = hanaTokens
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(tokens.panel)
+            .background(HanaColors.bgCard)
+            .padding(horizontal = 14.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, color = HanaColors.text, fontSize = 14.sp, modifier = Modifier.weight(1f))
+        Switch(
+            checked = checked,
+            onCheckedChange = onChange,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = HanaColors.text,
+                checkedTrackColor = HanaColors.accentPink,
+                uncheckedThumbColor = HanaColors.textDim,
+                uncheckedTrackColor = HanaColors.stroke,
+            ),
+        )
+    }
+}
+
+@Composable
+private fun VariationRow(index: Int, count: Int, onCycle: (Int) -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            "${Copy.variation} ${index + 1}/$count",
+            color = HanaColors.text,
+            fontSize = 13.sp,
+            modifier = Modifier.weight(1f),
+        )
+        CapsuleButton(Copy.prevVariation, { onCycle(-1) }, modifier = Modifier.weight(1f))
+        CapsuleButton(Copy.nextVariation, { onCycle(1) }, modifier = Modifier.weight(1f))
+    }
+}
+
+@Composable
+private fun CandidatesCard(
+    engineOnline: Boolean,
+    analyzing: Boolean,
+    candidates: List<Candidate>,
+    showCandidates: Boolean,
+) {
+    if (!showCandidates) return
+    val tokens = hanaTokens
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(tokens.panel)
+            .background(HanaColors.bgCard)
+            .padding(14.dp),
+    ) {
+        Text(Copy.candidates, color = HanaColors.text, fontSize = 14.sp)
+        Spacer(Modifier.height(8.dp))
+        when {
+            !engineOnline -> Text(Copy.engineOfflineHint, color = HanaColors.textDim, fontSize = 13.sp)
+            candidates.isEmpty() -> Text(
+                if (analyzing) Copy.engineAnalyzing else Copy.waitingForAnalysis,
+                color = HanaColors.textDim,
+                fontSize = 13.sp,
+            )
+            else -> candidates.forEachIndexed { index, candidate ->
+                val loss = formatScoreLoss(candidate.pointsLost)
+                Text(
+                    "${candidate.gtp}  ·  $loss  ·  ${candidate.visits} ${Copy.visitsLabel}",
+                    color = HanaColors.text,
+                    fontSize = 13.sp,
+                )
+                if (index != candidates.lastIndex) Spacer(Modifier.height(4.dp))
+            }
+        }
+    }
+}
+
+@Composable
+fun StatusCard(snapshot: SessionSnapshot) {
+    val tokens = hanaTokens
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(tokens.panel)
+            .background(HanaColors.bgCard)
+            .padding(14.dp),
+    ) {
+        val appearance = hanaAppearance
+        val toPlay = if (snapshot.toPlay == StoneColor.Black) Copy.black else Copy.white
+        val toPlayColor = appearance.swatch(snapshot.toPlay).fill
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            ColorDot(toPlayColor)
+            Spacer(Modifier.size(8.dp))
+            Text(
+                "${Copy.toPlay}: $toPlay",
+                color = HanaColors.text,
+                fontSize = 16.sp,
+            )
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(
+            "${Copy.move} ${snapshot.moveNumber}  ·  ${snapshot.size}×${snapshot.size}  ·  komi ${snapshot.komi}",
+            color = HanaColors.textDim,
+            fontSize = 13.sp,
+        )
+        if (snapshot.mode == PlayMode.HumanVsAi) {
+            val style = if (snapshot.aiStyle == AiStyle.Full) Copy.fullStrength else "Rank ${rankLabel(snapshot.rankKyu)}"
+            Text(
+                style,
+                color = HanaColors.accentLilac,
+                fontSize = 13.sp,
+            )
+        }
+        if (snapshot.reviewing) {
+            Spacer(Modifier.height(6.dp))
+            Text(Copy.review, color = HanaColors.accentPink, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+        }
+        Spacer(Modifier.height(10.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("${Copy.captured}  ", color = HanaColors.textDim, fontSize = 13.sp)
+            ColorDot(appearance.first.fill, 8.dp)
+            Text(" ${snapshot.capturedByBlack}   ", color = HanaColors.textDim, fontSize = 13.sp)
+            ColorDot(appearance.second.fill, 8.dp)
+            Text(" ${snapshot.capturedByWhite}", color = HanaColors.textDim, fontSize = 13.sp)
+        }
+    }
+}
+
+@Composable
+private fun ColorDot(color: Color, size: Dp = 10.dp) {
+    Box(
+        Modifier
+            .size(size)
+            .clip(CircleShape)
+            .background(color),
+    )
+}

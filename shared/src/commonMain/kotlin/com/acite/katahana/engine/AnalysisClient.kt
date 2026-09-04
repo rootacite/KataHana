@@ -1,0 +1,304 @@
+package com.acite.katahana.engine
+
+import com.acite.katahana.domain.GameTree
+import com.acite.katahana.domain.StoneColor
+import com.acite.katahana.settings.SettingsRepository
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
+import kotlin.random.Random
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlin.coroutines.cancellation.CancellationException
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeout
+
+@SingleIn(AppScope::class)
+class AnalysisClient @Inject constructor(
+    private val settings: SettingsRepository,
+) {
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val ws = WsClient()
+    private val waitersMutex = Mutex()
+    private val waiters = mutableMapOf<String, CompletableDeferred<AnalysisResponse>>()
+
+    private val _status = MutableStateFlow(EngineStatus())
+    val status: StateFlow<EngineStatus> = _status.asStateFlow()
+
+    private val _live = MutableStateFlow<LiveAnalysis?>(null)
+    val live: StateFlow<LiveAnalysis?> = _live.asStateFlow()
+
+    private var outbound: Channel<String>? = null
+    private var inFlight: InFlight? = null
+    private var currentProfile: EngineProfile = EngineProfile()
+
+    init {
+        scope.launch {
+            settings.engineProfile
+                .distinctUntilChanged()
+                .collectLatest { profile ->
+                    currentProfile = profile
+                    runConnection(profile)
+                }
+        }
+    }
+
+    fun analyzeLive(sessionId: String, tree: GameTree) {
+        val profile = currentProfile
+        if (profile.url.isBlank()) return
+        if (!_status.value.online && _status.value.phase != EnginePhase.Connecting) return
+        val nonce = Random.nextLong().toULong().toString(16)
+        val query = buildLiveQuery(
+            sessionId = sessionId,
+            nodeId = tree.current.id,
+            nonce = nonce,
+            tree = tree,
+            maxVisits = profile.playVisits,
+        )
+        val previous = inFlight
+        inFlight = InFlight(
+            queryId = query.id,
+            sessionId = sessionId,
+            nodeId = tree.current.id,
+            boardSize = tree.size,
+            toPlay = tree.current.position.toPlay,
+        )
+        _status.value = EngineStatus(EnginePhase.Analyzing)
+        scope.launch {
+            if (previous != null) {
+                sendJson(
+                    analysisJson.encodeToString(
+                        TerminateQuery.serializer(),
+                        TerminateQuery(id = "term:$nonce", terminateId = previous.queryId),
+                    ),
+                )
+            }
+            sendJson(analysisJson.encodeToString(AnalysisQuery.serializer(), query))
+        }
+    }
+
+    fun cancelLive(sessionId: String) {
+        val current = inFlight ?: return
+        if (current.sessionId != sessionId) return
+        inFlight = null
+        if (_status.value.phase == EnginePhase.Analyzing) {
+            _status.value = EngineStatus(EnginePhase.Ready)
+        }
+        scope.launch {
+            sendJson(
+                analysisJson.encodeToString(
+                    TerminateQuery.serializer(),
+                    TerminateQuery(
+                        id = "term-cancel:$sessionId",
+                        terminateId = current.queryId,
+                    ),
+                ),
+            )
+        }
+    }
+
+    suspend fun queryPolicy(sessionId: String, tree: GameTree): List<Double> =
+        queryRank(sessionId, tree).policy
+
+    suspend fun queryRank(sessionId: String, tree: GameTree): AnalysisResponse {
+        val nonce = Random.nextLong().toULong().toString(16)
+        val nodeId = tree.current.id
+        val query = buildRankQuery(
+            sessionId,
+            nodeId,
+            nonce,
+            tree,
+            maxVisits = currentProfile.playVisits,
+        )
+        val response = sendAndAwaitFinal(
+            query,
+            InFlight(query.id, sessionId, nodeId, tree.size, tree.current.position.toPlay),
+        )
+        if (response.error != null) error(response.error)
+        return response
+    }
+
+    suspend fun queryGenmove(sessionId: String, tree: GameTree): AnalysisResponse {
+        val nonce = Random.nextLong().toULong().toString(16)
+        val nodeId = tree.current.id
+        val query = buildGenmoveQuery(
+            sessionId,
+            nodeId,
+            nonce,
+            tree,
+            maxVisits = currentProfile.playVisits,
+        )
+        val response = sendAndAwaitFinal(
+            query,
+            InFlight(query.id, sessionId, nodeId, tree.size, tree.current.position.toPlay),
+        )
+        if (response.error != null) error(response.error)
+        return response
+    }
+
+    private suspend fun sendAndAwaitFinal(query: AnalysisQuery, flight: InFlight): AnalysisResponse {
+        val deferred = CompletableDeferred<AnalysisResponse>()
+        waitersMutex.withLock { waiters[query.id] = deferred }
+        try {
+            awaitOnline()
+            terminateLive()
+            inFlight = flight
+            _status.value = EngineStatus(EnginePhase.Analyzing)
+            sendJson(analysisJson.encodeToString(AnalysisQuery.serializer(), query))
+            return withTimeout(60_000) { deferred.await() }
+        } finally {
+            waitersMutex.withLock { waiters.remove(query.id) }
+            if (inFlight?.queryId == query.id) {
+                inFlight = null
+                if (_status.value.phase == EnginePhase.Analyzing) {
+                    _status.value = EngineStatus(EnginePhase.Ready)
+                }
+            }
+        }
+    }
+
+    private fun terminateLive() {
+        val previous = inFlight ?: return
+        inFlight = null
+        val nonce = Random.nextLong().toULong().toString(16)
+        sendJson(
+            analysisJson.encodeToString(
+                TerminateQuery.serializer(),
+                TerminateQuery(id = "term:$nonce", terminateId = previous.queryId),
+            ),
+        )
+    }
+
+    suspend fun testConnection(): TestResult {
+        val profile = settings.engineProfile.first()
+        currentProfile = profile
+        if (profile.url.isBlank()) return TestResult.Fail("Set a WebSocket URL first.")
+        val id = "test:${Random.nextLong().toULong().toString(16)}"
+        val deferred = CompletableDeferred<AnalysisResponse>()
+        waitersMutex.withLock { waiters[id] = deferred }
+        try {
+            awaitOnline()
+            sendJson(analysisJson.encodeToString(AnalysisQuery.serializer(), buildTestQuery(id)))
+            val response = withTimeout(20_000) { deferred.await() }
+            if (response.error != null) {
+                val field = response.field?.let { " ($it)" } ?: ""
+                return TestResult.Fail("${response.error}$field")
+            }
+            val visits = response.rootInfo?.visits ?: 0
+            return TestResult.Ok(visits)
+        } catch (e: Exception) {
+            return TestResult.Fail(e.message ?: "Connection failed")
+        } finally {
+            waitersMutex.withLock { waiters.remove(id) }
+        }
+    }
+
+    private suspend fun awaitOnline() {
+        if (_status.value.online) return
+        withTimeout(12_000) {
+            status.first { it.online }
+        }
+    }
+
+    private suspend fun runConnection(profile: EngineProfile) {
+        outbound?.close()
+        outbound = null
+        inFlight = null
+        if (profile.url.isBlank()) {
+            _status.value = EngineStatus(EnginePhase.Disconnected)
+            _live.value = null
+            return
+        }
+        var backoff = 1_000L
+        while (true) {
+            _status.value = EngineStatus(EnginePhase.Connecting)
+            val channel = Channel<String>(Channel.BUFFERED)
+            outbound = channel
+            try {
+                ws.connect(
+                    url = profile.url,
+                    token = profile.token,
+                    outgoing = channel,
+                    onOpen = {
+                        backoff = 1_000L
+                        _status.value = EngineStatus(EnginePhase.Ready)
+                    },
+                    onText = { text -> handleFrame(text) },
+                )
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _status.value = EngineStatus(
+                    EnginePhase.Error,
+                    e.message?.take(160) ?: "Connection failed",
+                )
+            } finally {
+                if (outbound === channel) outbound = null
+                channel.close()
+            }
+            delay(backoff)
+            backoff = (backoff * 2).coerceAtMost(15_000L)
+        }
+    }
+
+    private suspend fun handleFrame(text: String) {
+        val response = try {
+            analysisJson.decodeFromString(AnalysisResponse.serializer(), text)
+        } catch (_: Exception) {
+            return
+        }
+        val id = response.id
+        if (id != null && (!response.isDuringSearch || response.error != null)) {
+            val waiter = waitersMutex.withLock { waiters[id] }
+            waiter?.complete(response)
+        }
+        if (response.action != null && response.rootInfo == null) return
+        val flight = inFlight ?: return
+        if (id != flight.queryId) return
+        if (response.error != null) {
+            _status.value = EngineStatus(EnginePhase.Ready, response.error)
+            return
+        }
+        val root = response.rootInfo ?: return
+        val view = toBlackView(root.winrate, root.scoreLead)
+        _live.value = LiveAnalysis(
+            queryId = flight.queryId,
+            sessionId = flight.sessionId,
+            nodeId = flight.nodeId,
+            blackWinrate = view.winrate,
+            blackScoreLead = view.scoreLead,
+            visits = root.visits,
+            candidates = selectCandidates(response.moveInfos, flight.boardSize, flight.toPlay),
+            isDuringSearch = response.isDuringSearch,
+            moveInfos = response.moveInfos,
+            toPlay = flight.toPlay,
+        )
+        if (!response.isDuringSearch) {
+            _status.value = EngineStatus(EnginePhase.Ready)
+        }
+    }
+
+    private fun sendJson(text: String) {
+        outbound?.trySend(text)
+    }
+
+    private data class InFlight(
+        val queryId: String,
+        val sessionId: String,
+        val nodeId: String,
+        val boardSize: Int,
+        val toPlay: StoneColor,
+    )
+}
