@@ -14,5 +14,7 @@ struct ContentView: View {
     var body: some View {
         ComposeView()
             .ignoresSafeArea()
+            .statusBarHidden(true)
+            .persistentSystemOverlays(.hidden)
     }
 }

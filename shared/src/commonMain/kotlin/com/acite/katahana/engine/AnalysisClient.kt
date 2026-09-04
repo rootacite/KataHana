@@ -26,13 +26,15 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
 
+@Inject
 @SingleIn(AppScope::class)
-class AnalysisClient @Inject constructor(
+class AnalysisClient(
     private val settings: SettingsRepository,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val ws = WsClient()
     private val waitersMutex = Mutex()
+    private val sendMutex = Mutex()
     private val waiters = mutableMapOf<String, CompletableDeferred<AnalysisResponse>>()
 
     private val _status = MutableStateFlow(EngineStatus())
@@ -60,33 +62,40 @@ class AnalysisClient @Inject constructor(
         val profile = currentProfile
         if (profile.url.isBlank()) return
         if (!_status.value.online && _status.value.phase != EnginePhase.Connecting) return
+        val nodeId = tree.current.id
+        val existing = inFlight
+        if (existing != null && existing.sessionId == sessionId && existing.nodeId == nodeId) return
         val nonce = Random.nextLong().toULong().toString(16)
         val query = buildLiveQuery(
             sessionId = sessionId,
-            nodeId = tree.current.id,
+            nodeId = nodeId,
             nonce = nonce,
             tree = tree,
             maxVisits = profile.playVisits,
         )
-        val previous = inFlight
+        val previous = existing
         inFlight = InFlight(
             queryId = query.id,
             sessionId = sessionId,
-            nodeId = tree.current.id,
+            nodeId = nodeId,
             boardSize = tree.size,
             toPlay = tree.current.position.toPlay,
         )
         _status.value = EngineStatus(EnginePhase.Analyzing)
         scope.launch {
-            if (previous != null) {
-                sendJson(
-                    analysisJson.encodeToString(
-                        TerminateQuery.serializer(),
-                        TerminateQuery(id = "term:$nonce", terminateId = previous.queryId),
-                    ),
-                )
+            sendMutex.withLock {
+                if (inFlight?.queryId != query.id) return@withLock
+                if (previous != null) {
+                    sendJson(
+                        analysisJson.encodeToString(
+                            TerminateQuery.serializer(),
+                            TerminateQuery(id = "term:$nonce", terminateId = previous.queryId),
+                        ),
+                    )
+                }
+                if (inFlight?.queryId != query.id) return@withLock
+                sendJson(analysisJson.encodeToString(AnalysisQuery.serializer(), query))
             }
-            sendJson(analysisJson.encodeToString(AnalysisQuery.serializer(), query))
         }
     }
 
@@ -172,10 +181,12 @@ class AnalysisClient @Inject constructor(
         waitersMutex.withLock { waiters[query.id] = deferred }
         try {
             awaitOnline()
-            terminateLive()
-            inFlight = flight
-            _status.value = EngineStatus(EnginePhase.Analyzing)
-            sendJson(analysisJson.encodeToString(AnalysisQuery.serializer(), query))
+            sendMutex.withLock {
+                terminateLive()
+                inFlight = flight
+                _status.value = EngineStatus(EnginePhase.Analyzing)
+                sendJson(analysisJson.encodeToString(AnalysisQuery.serializer(), query))
+            }
             return withTimeout(60_000) { deferred.await() }
         } finally {
             waitersMutex.withLock { waiters.remove(query.id) }

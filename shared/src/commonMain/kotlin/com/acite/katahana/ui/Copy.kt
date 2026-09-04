@@ -52,6 +52,7 @@ object Copy {
     const val showDots = "Show dots"
     const val connections = "Connections"
     const val showOwnership = "Ownership"
+    const val deadStones = "Dead stones"
     const val analyzeGame = "Analyze game"
     const val cancelReview = "Cancel review"
 

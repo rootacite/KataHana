@@ -18,10 +18,8 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -46,10 +44,9 @@ import cafe.adriel.voyager.navigator.currentOrThrow
 import com.acite.katahana.domain.GameConfig
 import com.acite.katahana.domain.GameTree
 import com.acite.katahana.engine.EnginePhase
+import com.acite.katahana.getPlatform
 import com.acite.katahana.engine.EngineStatus
 import com.acite.katahana.sgf.LocalSgfFiles
-import androidx.compose.ui.ExperimentalComposeUiApi
-import androidx.compose.ui.backhandler.BackHandler
 import com.acite.katahana.ui.Copy
 import com.acite.katahana.ui.board.BoardCanvas
 import com.acite.katahana.ui.components.EngineDot
@@ -57,6 +54,7 @@ import com.acite.katahana.ui.components.LeaveGameDialog
 import com.acite.katahana.ui.components.QuietTextButton
 import com.acite.katahana.ui.components.SaveNameDialog
 import com.acite.katahana.ui.components.WinrateTrack
+import com.acite.katahana.ui.navigation.HanaBackHandler
 import com.acite.katahana.ui.settings.SettingsScreen
 import com.acite.katahana.ui.theme.HanaColors
 import com.acite.katahana.ui.theme.hanaTokens
@@ -84,7 +82,6 @@ class SessionScreen(
     }
 }
 
-@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 private fun SessionRoute(vm: SessionViewModel) {
     val ui by vm.state.collectAsState()
@@ -93,6 +90,7 @@ private fun SessionRoute(vm: SessionViewModel) {
     val showQuality by vm.showQuality.collectAsState()
     val showConnections by vm.showConnections.collectAsState()
     val showOwnership by vm.showOwnership.collectAsState()
+    val showDeadStones by vm.showDeadStones.collectAsState()
     val ownershipStyle by vm.ownershipStyle.collectAsState()
     val navigator = LocalNavigator.currentOrThrow
     val snapshot = ui.snapshot
@@ -141,114 +139,120 @@ private fun SessionRoute(vm: SessionViewModel) {
             nameAsk = false
         }
     }
-    BackHandler { requestLeave() }
+    HanaBackHandler { requestLeave() }
 
-    Column(
+    BoxWithConstraints(
         Modifier
             .fillMaxSize()
-            .background(HanaColors.bgApp)
-            .statusBarsPadding()
-            .navigationBarsPadding(),
+            .background(HanaColors.bgApp),
     ) {
-        SessionTopBar(
-            status = ui.engineStatus,
-            blackWinrate = ui.blackWinrate?.toFloat(),
-            reviewing = snapshot.reviewing,
-            onMenu = { drawerOpen = true },
-        )
-        Box(Modifier.weight(1f).fillMaxWidth()) {
-            BoxWithConstraints(Modifier.fillMaxSize().padding(8.dp)) {
-                val boardSide = minOf(maxWidth, maxHeight).coerceAtLeast(120.dp)
-                val leftover = maxWidth - boardSide
-                val showSideTree = leftover >= 168.dp
-                val board: @Composable () -> Unit = {
-                    BoardCanvas(
+        val landscape = getPlatform().isMobile && maxWidth > maxHeight
+        val chromePad = if (landscape) 4.dp else 8.dp
+        Column(Modifier.fillMaxSize().padding(top = chromePad)) {
+            SessionTopBar(
+                status = ui.engineStatus,
+                blackWinrate = ui.blackWinrate?.toFloat(),
+                reviewing = snapshot.reviewing,
+                compact = landscape,
+                onMenu = { drawerOpen = true },
+            )
+            Box(Modifier.weight(1f).fillMaxWidth()) {
+                BoxWithConstraints(Modifier.fillMaxSize().padding(chromePad)) {
+                    val boardSide = minOf(maxWidth, maxHeight).coerceAtLeast(120.dp)
+                    val leftover = maxWidth - boardSide
+                    val showSideTree = leftover >= 168.dp
+                    val board: @Composable () -> Unit = {
+                        BoardCanvas(
+                            snapshot = snapshot,
+                            showCoords = coords,
+                            preview = ui.preview,
+                            onHover = vm::onHover,
+                            onActivate = vm::onActivate,
+                            modifier = Modifier.size(boardSide),
+                            candidates = boardCandidates,
+                            qualities = boardQualities,
+                            showConnections = showConnections,
+                            ownership = ui.ownership,
+                            showOwnership = showOwnership,
+                            ownershipStyle = ownershipStyle,
+                            deadPoints = if (showDeadStones) ui.deadPoints else emptySet(),
+                        )
+                    }
+                    if (showSideTree) {
+                        Row(
+                            Modifier.fillMaxSize(),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            GameTreeCard(
+                                layout = ui.tree,
+                                reviewing = snapshot.reviewing,
+                                onGoToNode = vm::goToNode,
+                                compact = true,
+                                modifier = Modifier
+                                    .width(leftover.coerceAtMost(280.dp))
+                                    .fillMaxHeight()
+                                    .padding(end = chromePad),
+                            )
+                            Box(
+                                Modifier.weight(1f).fillMaxHeight(),
+                                contentAlignment = Alignment.Center,
+                            ) { board() }
+                        }
+                    } else {
+                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { board() }
+                    }
+                }
+                SessionDrawerOverlay(
+                    open = drawerOpen,
+                    onOpen = { drawerOpen = true },
+                    onClose = { drawerOpen = false },
+                ) {
+                    SidePanel(
                         snapshot = snapshot,
-                        showCoords = coords,
-                        preview = ui.preview,
-                        onHover = vm::onHover,
-                        onActivate = vm::onActivate,
-                        modifier = Modifier.size(boardSide),
-                        candidates = boardCandidates,
-                        qualities = boardQualities,
+                        hasSelection = ui.selected != null,
+                        engineOnline = ui.engineStatus.online,
+                        analyzing = ui.analyzing,
+                        candidates = ui.candidates,
+                        showCandidates = showCandidates,
+                        onShowCandidatesChange = vm::setShowCandidates,
+                        showQuality = showQuality,
+                        onShowQualityChange = vm::setShowQuality,
                         showConnections = showConnections,
-                        ownership = ui.ownership,
+                        onShowConnectionsChange = vm::setShowConnections,
+                        showCoords = coords,
+                        onShowCoordsChange = vm::setShowCoords,
                         showOwnership = showOwnership,
-                        ownershipStyle = ownershipStyle,
+                        onShowOwnershipChange = vm::setShowOwnership,
+                        showDeadStones = showDeadStones,
+                        onShowDeadStonesChange = vm::setShowDeadStones,
+                        reviewProgress = ui.reviewProgress,
+                        onAnalyzeGame = vm::analyzeGame,
+                        aiThinking = ui.aiThinking,
+                        aiError = ui.aiError,
+                        onPass = vm::pass,
+                        onUndo = vm::undo,
+                        onRedo = vm::redo,
+                        onConfirm = vm::confirmSelected,
+                        onCycleVariation = vm::cycleVariation,
+                        onGoToNode = vm::goToNode,
+                        tree = ui.tree,
+                        dirty = ui.dirty,
+                        canSave = ui.canSave,
+                        onSave = { performSave(false) },
+                        onSaveAs = {
+                            nameDraft = vm.suggestedTitle()
+                            nameThenLeave = false
+                            nameAsk = true
+                        },
+                        onExportSgf = exportSgf,
+                        onBack = requestLeave,
+                        onSettings = {
+                            drawerOpen = false
+                            navigator.push(SettingsScreen())
+                        },
+                        modifier = Modifier.fillMaxSize(),
                     )
                 }
-                if (showSideTree) {
-                    Row(
-                        Modifier.fillMaxSize(),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        GameTreeCard(
-                            layout = ui.tree,
-                            reviewing = snapshot.reviewing,
-                            onGoToNode = vm::goToNode,
-                            compact = true,
-                            modifier = Modifier
-                                .width(leftover.coerceAtMost(280.dp))
-                                .fillMaxHeight()
-                                .padding(end = 8.dp),
-                        )
-                        Box(
-                            Modifier.weight(1f).fillMaxHeight(),
-                            contentAlignment = Alignment.Center,
-                        ) { board() }
-                    }
-                } else {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { board() }
-                }
-            }
-            SessionDrawerOverlay(
-                open = drawerOpen,
-                onOpen = { drawerOpen = true },
-                onClose = { drawerOpen = false },
-            ) {
-                SidePanel(
-                    snapshot = snapshot,
-                    hasSelection = ui.selected != null,
-                    engineOnline = ui.engineStatus.online,
-                    analyzing = ui.analyzing,
-                    candidates = ui.candidates,
-                    showCandidates = showCandidates,
-                    onShowCandidatesChange = vm::setShowCandidates,
-                    showQuality = showQuality,
-                    onShowQualityChange = vm::setShowQuality,
-                    showConnections = showConnections,
-                    onShowConnectionsChange = vm::setShowConnections,
-                    showCoords = coords,
-                    onShowCoordsChange = vm::setShowCoords,
-                    showOwnership = showOwnership,
-                    onShowOwnershipChange = vm::setShowOwnership,
-                    reviewProgress = ui.reviewProgress,
-                    onAnalyzeGame = vm::analyzeGame,
-                    aiThinking = ui.aiThinking,
-                    aiError = ui.aiError,
-                    onPass = vm::pass,
-                    onUndo = vm::undo,
-                    onRedo = vm::redo,
-                    onConfirm = vm::confirmSelected,
-                    onCycleVariation = vm::cycleVariation,
-                    onGoToNode = vm::goToNode,
-                    tree = ui.tree,
-                    dirty = ui.dirty,
-                    canSave = ui.canSave,
-                    onSave = { performSave(false) },
-                    onSaveAs = {
-                        nameDraft = vm.suggestedTitle()
-                        nameThenLeave = false
-                        nameAsk = true
-                    },
-                    onExportSgf = exportSgf,
-                    onBack = requestLeave,
-                    onSettings = {
-                        drawerOpen = false
-                        navigator.push(SettingsScreen())
-                    },
-                    modifier = Modifier.fillMaxSize(),
-                )
             }
         }
     }
@@ -274,16 +278,17 @@ internal fun SessionTopBar(
     blackWinrate: Float?,
     onMenu: () -> Unit,
     reviewing: Boolean = false,
+    compact: Boolean = false,
 ) {
     Row(
         Modifier
             .fillMaxWidth()
-            .height(44.dp)
-            .padding(horizontal = 8.dp),
+            .then(if (compact) Modifier else Modifier.height(44.dp))
+            .padding(horizontal = if (compact) 4.dp else 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         EngineDot(online = status.online)
-        Spacer(Modifier.width(10.dp))
+        Spacer(Modifier.width(if (compact) 6.dp else 10.dp))
         WinrateTrack(
             Modifier.weight(1f).padding(end = 4.dp),
             blackWinrate = blackWinrate,
@@ -295,7 +300,10 @@ internal fun SessionTopBar(
                     .clip(hanaTokens.capsule)
                     .background(HanaColors.accentPink.copy(alpha = 0.18f))
                     .clickable(onClick = onMenu)
-                    .padding(horizontal = 10.dp, vertical = 5.dp),
+                    .padding(
+                        horizontal = if (compact) 8.dp else 10.dp,
+                        vertical = if (compact) 2.dp else 5.dp,
+                    ),
             ) {
                 Text(
                     Copy.review,
@@ -306,7 +314,20 @@ internal fun SessionTopBar(
             }
             Spacer(Modifier.width(4.dp))
         }
-        QuietTextButton(Copy.menu, onClick = onMenu)
+        if (compact) {
+            Text(
+                Copy.menu,
+                color = HanaColors.accentLilac,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier
+                    .clip(hanaTokens.capsule)
+                    .clickable(onClick = onMenu)
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+            )
+        } else {
+            QuietTextButton(Copy.menu, onClick = onMenu)
+        }
     }
 }
 

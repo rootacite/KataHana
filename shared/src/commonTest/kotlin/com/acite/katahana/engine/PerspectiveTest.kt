@@ -1,6 +1,7 @@
 package com.acite.katahana.engine
 
 import com.acite.katahana.domain.Point
+import com.acite.katahana.domain.Position
 import com.acite.katahana.domain.StoneColor
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -129,6 +130,100 @@ class PerspectiveTest {
     fun parseLiveQueryIdReadsSessionAndNode() {
         val parsed = parseLiveQueryId("abc:n3:live:ff")
         assertEquals("abc" to "n3", parsed)
+    }
+
+    @Test
+    fun classifyDeadMarksBlackInWhiteTerritory() {
+        val p = Point.fromGtp("D4", 9)!!
+        val pos = Position.of(9, black = listOf(p))
+        val ownership = MutableList(81) { 0.0 }
+        ownership[p.index(9)] = -0.9
+        assertEquals(setOf(p), classifyDead(pos.cells, 9, ownership))
+    }
+
+    @Test
+    fun classifyDeadMarksWhiteInBlackTerritory() {
+        val p = Point.fromGtp("E5", 9)!!
+        val pos = Position.of(9, white = listOf(p))
+        val ownership = MutableList(81) { 0.0 }
+        ownership[p.index(9)] = 0.9
+        assertEquals(setOf(p), classifyDead(pos.cells, 9, ownership))
+    }
+
+    @Test
+    fun classifyDeadIgnoresBelowEnterThreshold() {
+        val p = Point.fromGtp("D4", 9)!!
+        val pos = Position.of(9, black = listOf(p))
+        val ownership = MutableList(81) { 0.0 }
+        ownership[p.index(9)] = -0.5
+        assertEquals(emptySet(), classifyDead(pos.cells, 9, ownership))
+    }
+
+    @Test
+    fun classifyDeadStickyOnUnmatchedNodeDoesNotMarkNewStone() {
+        val oldDead = Point.fromGtp("A1", 9)!!
+        val placed = Point.fromGtp("D4", 9)!!
+        val pos = Position.of(9, black = listOf(oldDead, placed))
+        val dead = classifyDead(
+            cells = pos.cells,
+            size = 9,
+            ownership = emptyList(),
+            previousDead = setOf(oldDead),
+            sameNode = false,
+        )
+        assertEquals(setOf(oldDead), dead)
+        assertTrue(placed !in dead)
+    }
+
+    @Test
+    fun classifyDeadDropsCapturedFromSticky() {
+        val oldDead = Point.fromGtp("A1", 9)!!
+        val dead = classifyDead(
+            cells = Position.empty(9).cells,
+            size = 9,
+            ownership = emptyList(),
+            previousDead = setOf(oldDead),
+            sameNode = false,
+        )
+        assertEquals(emptySet(), dead)
+    }
+
+    @Test
+    fun classifyDeadMatchingMapMarksNewStoneOnce() {
+        val placed = Point.fromGtp("D4", 9)!!
+        val pos = Position.of(9, black = listOf(placed))
+        val ownership = MutableList(81) { 0.0 }
+        ownership[placed.index(9)] = -0.9
+        assertEquals(
+            setOf(placed),
+            classifyDead(pos.cells, 9, ownership, previousDead = emptySet(), sameNode = false),
+        )
+        ownership[placed.index(9)] = 0.8
+        assertEquals(
+            emptySet(),
+            classifyDead(pos.cells, 9, ownership, previousDead = setOf(placed), sameNode = true),
+        )
+    }
+
+    @Test
+    fun classifyDeadHysteresisOnSameNode() {
+        val p = Point.fromGtp("D4", 9)!!
+        val pos = Position.of(9, black = listOf(p))
+        val ownership = MutableList(81) { 0.0 }
+        ownership[p.index(9)] = -0.50
+        assertEquals(
+            setOf(p),
+            classifyDead(pos.cells, 9, ownership, previousDead = setOf(p), sameNode = true),
+        )
+        assertEquals(
+            emptySet(),
+            classifyDead(pos.cells, 9, ownership, previousDead = emptySet(), sameNode = false),
+        )
+        ownership[p.index(9)] = -0.40
+        assertEquals(
+            emptySet(),
+            classifyDead(pos.cells, 9, ownership, previousDead = setOf(p), sameNode = true),
+        )
     }
 
     private fun move(gtp: String, order: Int, scoreLead: Double): MoveInfo = MoveInfo(

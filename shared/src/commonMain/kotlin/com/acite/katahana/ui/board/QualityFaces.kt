@@ -10,6 +10,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
 import com.acite.katahana.ai.QualityBand
+import com.acite.katahana.ui.theme.HanaColors
 
 fun DrawScope.drawQualityFace(center: Offset, stoneRadius: Float, band: QualityBand) {
     val r = stoneRadius * 0.96f
@@ -161,6 +162,46 @@ private fun DrawScope.drawSickFace(c: Offset, r: Float, pen: FacePen) {
         drawPath(tongue, pen.color.copy(alpha = 0.85f), style = Fill)
     }
     drawPath(tongue, pen.color, style = pen.stroke)
+}
+
+fun DrawScope.drawDeadFace(center: Offset, stoneRadius: Float, alpha: Float = 1f) {
+    val a = alpha.coerceIn(0f, 1f)
+    if (a <= 0.01f) return
+    val r = stoneRadius * 0.96f
+    val cap = StrokeCap.Round
+    val join = StrokeJoin.Round
+    val colorW = (r * 0.18f).coerceAtLeast(2.6f)
+    val haloW = (colorW + r * 0.07f).coerceAtLeast(colorW + 2.2f)
+    val outline = FacePen(
+        color = Color.White.copy(alpha = a),
+        stroke = Stroke(width = haloW, cap = cap, join = join),
+        pad = (haloW - colorW) * 0.5f,
+        fill = false,
+    )
+    val ink = FacePen(
+        color = HanaColors.accentLilac.copy(alpha = a),
+        stroke = Stroke(width = colorW, cap = cap, join = join),
+        pad = 0f,
+        fill = true,
+    )
+    paintHaloFace(center, r, outline)
+    paintHaloFace(center, r, ink)
+}
+
+/** Dot eyes, small o mouth, and a compact halo just above the eyes. */
+private fun DrawScope.paintHaloFace(c: Offset, r: Float, pen: FacePen) {
+    val haloCenter = pt(c, r, 0f, -0.46f)
+    drawCircle(
+        color = pen.color,
+        radius = r * 0.16f + pen.pad,
+        center = haloCenter,
+        style = Stroke(width = pen.stroke.width, cap = pen.stroke.cap, join = pen.stroke.join),
+    )
+    val eyeA = pen.color.alpha
+    dot(c, r, -0.22f, -0.02f, pen, r * 0.08f, eyeA)
+    dot(c, r, 0.22f, -0.02f, pen, r * 0.08f, eyeA)
+    val mouth = Rect(pt(c, r, -0.11f, 0.22f), pt(c, r, 0.11f, 0.42f))
+    drawOval(pen.color, topLeft = mouth.topLeft, size = mouth.size, style = pen.stroke)
 }
 
 private fun DrawScope.drawDottedFace(c: Offset, r: Float, pen: FacePen) {

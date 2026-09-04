@@ -81,7 +81,7 @@ fun buildRankQuery(
         moves = moves,
         analyzeTurns = listOf(moves.size),
         maxVisits = maxVisits,
-        includeOwnership = false,
+        includeOwnership = true,
         includePolicy = true,
         reportDuringSearchEvery = 0.4,
     )
@@ -104,7 +104,7 @@ fun buildGenmoveQuery(
         moves = moves,
         analyzeTurns = listOf(moves.size),
         maxVisits = maxVisits,
-        includeOwnership = false,
+        includeOwnership = true,
         includePolicy = false,
         reportDuringSearchEvery = 0.4,
     )

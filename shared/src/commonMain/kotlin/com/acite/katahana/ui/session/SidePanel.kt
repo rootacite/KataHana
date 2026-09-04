@@ -73,6 +73,8 @@ fun SidePanel(
     onShowCoordsChange: (Boolean) -> Unit = {},
     showOwnership: Boolean = false,
     onShowOwnershipChange: (Boolean) -> Unit = {},
+    showDeadStones: Boolean = false,
+    onShowDeadStonesChange: (Boolean) -> Unit = {},
     reviewProgress: ReviewProgress? = null,
     onAnalyzeGame: () -> Unit = {},
     onBack: (() -> Unit)? = null,
@@ -163,6 +165,11 @@ fun SidePanel(
             label = Copy.showOwnership,
             checked = showOwnership,
             onChange = onShowOwnershipChange,
+        )
+        ToggleCard(
+            label = Copy.deadStones,
+            checked = showDeadStones,
+            onChange = onShowDeadStonesChange,
         )
         val reviewing = reviewProgress?.running == true
         CapsuleButton(

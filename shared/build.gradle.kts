@@ -20,7 +20,13 @@ kotlin {
         }
     }
 
-    jvm()
+    jvmToolchain(17)
+
+    jvm {
+        compilerOptions {
+            jvmTarget = JvmTarget.JVM_17
+        }
+    }
 
     android {
         namespace = "com.acite.katahana.shared"
@@ -28,7 +34,7 @@ kotlin {
         minSdk = libs.versions.android.minSdk.get().toInt()
 
         compilerOptions {
-            jvmTarget = JvmTarget.JVM_11
+            jvmTarget = JvmTarget.JVM_17
         }
         androidResources {
             enable = true
@@ -48,6 +54,7 @@ kotlin {
             implementation(libs.compose.uiToolingPreview)
             implementation(libs.compose.uiTooling)
             implementation(libs.ktor.client.okhttp)
+            implementation(libs.savedstate.compose)
         }
         jvmMain.dependencies {
             implementation(libs.ktor.client.cio)
@@ -61,6 +68,7 @@ kotlin {
             implementation(libs.compose.material3)
             implementation(libs.compose.ui)
             implementation(libs.compose.uiBackhandler)
+            implementation(libs.navigationevent.compose)
             implementation(libs.compose.components.resources)
             implementation(libs.compose.uiToolingPreview)
             api(libs.metrox.viewmodel.compose)

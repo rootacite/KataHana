@@ -28,6 +28,8 @@ import com.acite.katahana.engine.AnalysisResponse
 import com.acite.katahana.engine.LiveAnalysis
 import com.acite.katahana.engine.MoveInfo
 import com.acite.katahana.engine.pointsLost
+import com.acite.katahana.engine.DEAD_MIN_VISITS
+import com.acite.katahana.engine.classifyDead
 import com.acite.katahana.engine.heldOwnership
 import com.acite.katahana.engine.selectCandidates
 import com.acite.katahana.engine.toBlackView
@@ -75,6 +77,7 @@ data class SessionUiState(
     val qualities: List<QualityMark> = emptyList(),
     val tree: TreeLayout = TreeLayout(emptyList(), "", 0, 0),
     val ownership: List<Double> = emptyList(),
+    val deadPoints: Set<Point> = emptySet(),
     val reviewProgress: ReviewProgress? = null,
     val dirty: Boolean = false,
     val canSave: Boolean = false,
@@ -119,6 +122,7 @@ class SessionViewModel(
     private var aiJob: Job? = null
     private var reviewJob: Job? = null
     private var navEpoch = 0
+    private var deadOwnershipNodeId: String? = null
     private var boundId: String? = recentId
     private var boundTitle: String = recentTitle?.takeIf { it.isNotBlank() } ?: defaultRecentTitle(config)
     private var boundCreatedAt: Long? = null
@@ -155,6 +159,11 @@ class SessionViewModel(
         SharingStarted.WhileSubscribed(1_000),
         false,
     )
+    val showDeadStones: StateFlow<Boolean> = settings.showDeadStones.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(1_000),
+        false,
+    )
     val ownershipStyle: StateFlow<OwnershipStyle> = settings.ownershipStyle.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(1_000),
@@ -164,6 +173,11 @@ class SessionViewModel(
         viewModelScope,
         SharingStarted.WhileSubscribed(1_000),
         QualityThresholds(),
+    )
+    private val playVisits: StateFlow<Int> = settings.playVisits.stateIn(
+        viewModelScope,
+        SharingStarted.Eagerly,
+        400,
     )
 
     fun setShowCandidates(value: Boolean) {
@@ -180,6 +194,10 @@ class SessionViewModel(
 
     fun setShowOwnership(value: Boolean) {
         viewModelScope.launch { settings.setShowOwnership(value) }
+    }
+
+    fun setShowDeadStones(value: Boolean) {
+        viewModelScope.launch { settings.setShowDeadStones(value) }
     }
 
     fun setShowCoords(value: Boolean) {
@@ -234,6 +252,12 @@ class SessionViewModel(
                             it.ownership,
                             live.ownership,
                             session.tree.size,
+                        ),
+                        deadPoints = resolveDead(
+                            live.nodeId,
+                            live.ownership,
+                            live.visits,
+                            it.deadPoints,
                         ),
                     )
                 }
@@ -386,6 +410,12 @@ class SessionViewModel(
                 blackScoreLead = eval?.blackScoreLead,
                 visits = eval?.visits ?: 0,
                 ownership = heldOwnership(it.ownership, eval?.ownership ?: emptyList(), session.tree.size),
+                deadPoints = resolveDead(
+                    session.tree.current.id,
+                    eval?.ownership ?: emptyList(),
+                    eval?.visits ?: 0,
+                    it.deadPoints,
+                ),
                 aiThinking = false,
                 aiError = null,
                 qualities = refreshQualities(),
@@ -457,9 +487,16 @@ class SessionViewModel(
     private fun isAiToPlay(): Boolean = session.aiShouldMove()
 
     private fun requestLive() {
-        if (analysis.status.value.online) {
-            analysis.analyzeLive(sessionId, session.tree)
-        }
+        if (!analysis.status.value.online) return
+        if (hasCompleteEval(session.tree.current.id)) return
+        analysis.analyzeLive(sessionId, session.tree)
+    }
+
+    private fun hasCompleteEval(nodeId: String): Boolean {
+        val eval = nodeEvals[nodeId] ?: return false
+        val n = session.tree.size * session.tree.size
+        if (eval.ownership.size != n) return false
+        return eval.visits >= playVisits.value
     }
 
     private fun snapshotLiveToCurrentNode() {
@@ -548,6 +585,16 @@ class SessionViewModel(
                             } else {
                                 state.ownership
                             },
+                            deadPoints = if (isCurrent) {
+                                resolveDead(
+                                    node.id,
+                                    eval?.ownership ?: emptyList(),
+                                    eval?.visits ?: 0,
+                                    state.deadPoints,
+                                )
+                            } else {
+                                state.deadPoints
+                            },
                         )
                     }
                 }
@@ -581,6 +628,28 @@ class SessionViewModel(
         analysis.cancelLive(sessionId)
         job.cancel()
         _state.update { it.copy(reviewProgress = it.reviewProgress?.copy(running = false)) }
+    }
+
+    /**
+     * Dead marks use only ownership computed for [nodeId].
+     * Stale/held heat is ignored so a drop into enemy ground does not flash dead.
+     */
+    private fun resolveDead(
+        nodeId: String,
+        ownership: List<Double>,
+        visits: Int,
+        previous: Set<Point>,
+    ): Set<Point> {
+        val size = session.tree.size
+        val cells = session.position.cells
+        val usable = ownership.size == size * size && visits >= DEAD_MIN_VISITS
+        if (!usable) {
+            return classifyDead(cells, size, emptyList(), previous, sameNode = false)
+        }
+        val same = nodeId == deadOwnershipNodeId
+        val next = classifyDead(cells, size, ownership, previous, sameNode = same)
+        deadOwnershipNodeId = nodeId
+        return next
     }
 
     private fun refreshQualities(): List<QualityMark> {

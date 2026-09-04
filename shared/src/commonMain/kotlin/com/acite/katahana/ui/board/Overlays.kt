@@ -27,21 +27,23 @@ fun DrawScope.drawLastMoveMark(
     swatch: StoneSwatch,
     pulse: Float,
     breath: Float,
+    alpha: Float = 1f,
 ) {
     val hot = swatch.rim
     val wash = swatch.fill
     val backing = if (swatch.light) Color(0xFF1A1228) else Color.White
+    val a = alpha.coerceIn(0f, 1f)
     fun ripple(t: Float) {
         val u = t.coerceIn(0f, 1f)
         val fade = (1f - u) * (1f - 0.35f * u)
         drawCircle(
-            color = wash.copy(alpha = fade * 0.82f),
+            color = wash.copy(alpha = fade * 0.82f * a),
             radius = radius * (1.16f + 0.62f * u),
             center = center,
             style = Stroke(width = (radius * (0.16f - 0.07f * u)).coerceAtLeast(2.0f)),
         )
         drawCircle(
-            color = backing.copy(alpha = fade * 0.55f),
+            color = backing.copy(alpha = fade * 0.55f * a),
             radius = radius * (1.16f + 0.62f * u),
             center = center,
             style = Stroke(width = (radius * 0.055f).coerceAtLeast(1.4f)),
@@ -53,13 +55,13 @@ fun DrawScope.drawLastMoveMark(
     val ringR = radius * (1.18f + 0.05f * breath)
     val ringW = (radius * (0.18f + 0.05f * breath)).coerceAtLeast(2.8f)
     drawCircle(
-        color = backing.copy(alpha = 0.98f),
+        color = backing.copy(alpha = 0.98f * a),
         radius = ringR,
         center = center,
         style = Stroke(width = ringW * 1.7f),
     )
     drawCircle(
-        color = hot.copy(alpha = 0.80f + 0.20f * breath),
+        color = hot.copy(alpha = (0.80f + 0.20f * breath) * a),
         radius = ringR,
         center = center,
         style = Stroke(width = ringW),
@@ -97,7 +99,7 @@ fun DrawScope.drawOwnershipLayer(
     }
 }
 
-private const val OWNERSHIP_ALPHA = 0.5f
+private const val OWNERSHIP_ALPHA = 0.5f * 0.65f
 
 private fun ownershipTint(v: Float): Color =
     if (v >= 0f) HanaColors.accentBlue else HanaColors.accentPink

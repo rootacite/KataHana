@@ -51,6 +51,7 @@ class QueryBuilderTest {
         val query = buildRankQuery("sess", tree.current.id, "1", tree)
         assertTrue(query.id.contains(":rank:"))
         assertEquals(true, query.includePolicy)
+        assertEquals(true, query.includeOwnership)
         assertEquals(1, query.maxVisits)
         assertEquals(listOf(0), query.analyzeTurns)
         assertEquals(0.4, query.reportDuringSearchEvery)
@@ -63,6 +64,7 @@ class QueryBuilderTest {
         assertTrue(query.id.contains(":genmove:"))
         assertEquals(400, query.maxVisits)
         assertEquals(false, query.includePolicy)
+        assertEquals(true, query.includeOwnership)
         assertEquals(0.4, query.reportDuringSearchEvery)
     }
 

@@ -138,3 +138,53 @@ fun lerpOwnership(from: FloatArray, to: FloatArray, t: Float): FloatArray {
     return FloatArray(n) { i -> from[i] * v + to[i] * u }
 }
 
+/** Enemy-territory |ownership| to enter the dead set. High confidence. */
+const val DEAD_ENTER = 0.70
+
+/** Enemy-territory |ownership| to leave the dead set. Same node only. */
+const val DEAD_LEAVE = 0.45
+
+/** Skip noisy early live packets when marking dead stones. */
+const val DEAD_MIN_VISITS = 20
+
+/** How strongly the opponent owns this point. Ownership is black-positive. */
+fun enemyOwnership(color: StoneColor, blackPositive: Double): Double =
+    if (color == StoneColor.Black) -blackPositive else blackPositive
+
+/**
+ * Dead stones from a KataGo ownership map.
+ *
+ * When [sameNode] is false, only [DEAD_ENTER] applies (jump to a cached eval, or
+ * sticky intersect if [ownership] is the wrong length). When true, stones already
+ * in [previousDead] stay dead until enemy ownership drops below [DEAD_LEAVE].
+ *
+ * Never marks a stone from a stale map: pass empty [ownership] after a move so
+ * new stones stay out of the set until this node's eval arrives.
+ */
+fun classifyDead(
+    cells: IntArray,
+    size: Int,
+    ownership: List<Double>,
+    previousDead: Set<Point> = emptySet(),
+    sameNode: Boolean = false,
+): Set<Point> {
+    val n = size * size
+    if (cells.size != n) return emptySet()
+    val onBoard = HashSet<Point>(n)
+    for (i in 0 until n) {
+        if (StoneColor.fromCell(cells[i]) != null) onBoard += Point.fromIndex(i, size)
+    }
+    val sticky = previousDead.filterTo(HashSet()) { it in onBoard }
+    if (ownership.size != n) return sticky
+    val next = HashSet<Point>()
+    for (i in 0 until n) {
+        val color = StoneColor.fromCell(cells[i]) ?: continue
+        val point = Point.fromIndex(i, size)
+        val enemy = enemyOwnership(color, ownership[i])
+        val wasDead = sameNode && point in sticky
+        val threshold = if (wasDead) DEAD_LEAVE else DEAD_ENTER
+        if (enemy >= threshold) next += point
+    }
+    return next
+}
+

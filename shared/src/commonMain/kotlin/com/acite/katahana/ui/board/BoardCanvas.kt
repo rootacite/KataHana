@@ -14,8 +14,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -59,8 +61,12 @@ fun BoardCanvas(
     ownership: List<Double> = emptyList(),
     showOwnership: Boolean = true,
     ownershipStyle: OwnershipStyle = OwnershipStyle.Blocks,
+    deadPoints: Set<Point> = emptySet(),
 ) {
     val squash = remember { Animatable(1f) }
+    val captureFlight = remember { Animatable(1f) }
+    var departing by remember { mutableStateOf(emptyList<DepartingStone>()) }
+    val captureMemory = remember { CaptureMemory() }
     var displayedNumber by remember { mutableIntStateOf(snapshot.moveNumber) }
     val pendingPlace = snapshot.moveNumber > displayedNumber &&
         snapshot.lastMove != null &&
@@ -131,6 +137,41 @@ fun BoardCanvas(
         }
         squash.snapTo(0.84f)
         squash.animateTo(1f, HanaMotion.softSpring())
+    }
+    LaunchedEffect(
+        snapshot.moveNumber,
+        snapshot.variationIndex,
+        snapshot.capturedByBlack,
+        snapshot.capturedByWhite,
+        snapshot.size,
+        snapshot.lastMove,
+    ) {
+        val size = snapshot.size
+        val previous = captureMemory.cells
+        val stepForward = size == captureMemory.size &&
+            previous.size == size * size &&
+            snapshot.cells.size == size * size &&
+            snapshot.moveNumber == captureMemory.moveNumber + 1
+        val vanished = if (stepForward) {
+            vanishedStones(previous, snapshot.cells, size)
+        } else {
+            emptyList()
+        }
+        captureMemory.cells = snapshot.cells.copyOf()
+        captureMemory.size = size
+        captureMemory.moveNumber = snapshot.moveNumber
+        if (vanished.isEmpty()) {
+            departing = emptyList()
+            if (captureFlight.value < 1f) captureFlight.snapTo(1f)
+            return@LaunchedEffect
+        }
+        departing = vanished
+        captureFlight.snapTo(0f)
+        captureFlight.animateTo(
+            1f,
+            tween(durationMillis = 820, easing = FastOutSlowInEasing),
+        )
+        departing = emptyList()
     }
     LaunchedEffect(snapshot.moveNumber, showConnections) {
         displayedNumber = snapshot.moveNumber
@@ -275,7 +316,8 @@ fun BoardCanvas(
                 val color = snapshot.stoneAt(x, y) ?: continue
                 val p = Point(x, y)
                 val squashY = if (p == snapshot.lastMove) squash.value else 1f
-                drawStone(color, appearance, layout.center(p), stoneR, squashY = squashY)
+                val alpha = if (p in deadPoints) 0.40f else 1f
+                drawStone(color, appearance, layout.center(p), stoneR, squashY = squashY, alpha = alpha)
             }
         }
         if (showConnections) {
@@ -289,9 +331,34 @@ fun BoardCanvas(
             )
         }
         for (mark in qualities) {
+            if (mark.point in deadPoints) continue
             val onBoard = snapshot.stoneAt(mark.point.x, mark.point.y)
             if (onBoard != mark.color) continue
             drawQualityFace(layout.center(mark.point), stoneR, mark.band)
+        }
+        for (point in deadPoints) {
+            if (snapshot.stoneAt(point.x, point.y) == null) continue
+            drawDeadFace(layout.center(point), stoneR)
+        }
+        val flightT = captureFlight.value
+        if (departing.isNotEmpty() && flightT < 0.999f) {
+            val fade = (1f - flightT).coerceIn(0f, 1f)
+            val lift = flightT * layout.gap * 1.45f
+            val shrink = 1f - 0.18f * flightT
+            for (ghost in departing) {
+                val origin = layout.center(ghost.point)
+                val c = Offset(origin.x, origin.y - lift)
+                scale(scale = shrink, pivot = c) {
+                    drawStone(
+                        ghost.color,
+                        appearance,
+                        c,
+                        stoneR,
+                        alpha = 0.40f * fade,
+                    )
+                    drawDeadFace(c, stoneR, alpha = fade)
+                }
+            }
         }
         snapshot.lastMove?.let { point ->
             val color = snapshot.stoneAt(point.x, point.y) ?: return@let
@@ -301,6 +368,7 @@ fun BoardCanvas(
                 swatch = appearance.swatch(color),
                 pulse = lastRipple.value,
                 breath = lastBreath.value,
+                alpha = if (point in deadPoints) 0.70f else 1f,
             )
         }
         candidates.forEach { candidate ->
@@ -326,6 +394,26 @@ fun BoardCanvas(
 private class OwnershipMorph {
     var from: FloatArray = FloatArray(0)
     var to: FloatArray = FloatArray(0)
+}
+
+private class CaptureMemory {
+    var cells: IntArray = IntArray(0)
+    var size: Int = 0
+    var moveNumber: Int = -1
+}
+
+internal data class DepartingStone(val point: Point, val color: StoneColor)
+
+internal fun vanishedStones(previous: IntArray, current: IntArray, size: Int): List<DepartingStone> {
+    val n = size * size
+    if (previous.size != n || current.size != n) return emptyList()
+    val out = ArrayList<DepartingStone>()
+    for (i in 0 until n) {
+        val was = StoneColor.fromCell(previous[i]) ?: continue
+        if (current[i] != StoneColor.EMPTY_CELL) continue
+        out += DepartingStone(Point.fromIndex(i, size), was)
+    }
+    return out
 }
 
 private data class BoardLayout(
