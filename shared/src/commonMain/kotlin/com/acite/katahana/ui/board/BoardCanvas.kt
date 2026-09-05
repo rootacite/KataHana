@@ -212,7 +212,7 @@ fun BoardCanvas(
             .onGloballyPositioned { coords ->
                 boardInWindow.value = coords.localToWindow(Offset.Zero)
             }
-            .pointerInput(boardSize, showCoords, snapshot.ended, snapshot.moveNumber) {
+            .pointerInput(boardSize, showCoords, snapshot.ended, snapshot.aiToPlay, snapshot.moveNumber) {
                 awaitPointerEventScope {
                     while (true) {
                         val event = awaitPointerEvent()
@@ -227,11 +227,11 @@ fun BoardCanvas(
                         val point = nearestIntersection(change.position, layout, TAP_MAX_GAPS)
                         when (event.type) {
                             PointerEventType.Move, PointerEventType.Enter -> {
-                                if (!snapshot.ended) onHover(point)
+                                if (!snapshot.ended && !snapshot.aiToPlay) onHover(point)
                             }
                             PointerEventType.Exit -> onHover(null)
                             PointerEventType.Release -> {
-                                if (snapshot.ended) continue
+                                if (snapshot.ended || snapshot.aiToPlay) continue
                                 if (change.changedToUpIgnoreConsumed()) {
                                     change.consume()
                                     if (point != null) onActivate(point, false)
@@ -242,12 +242,12 @@ fun BoardCanvas(
                     }
                 }
             }
-            .pointerInput(boardSize, showCoords, snapshot.ended, snapshot.moveNumber) {
+            .pointerInput(boardSize, showCoords, snapshot.ended, snapshot.aiToPlay, snapshot.moveNumber) {
                 val edgePx = 24.dp.toPx()
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
                     if (down.type == PointerType.Mouse) return@awaitEachGesture
-                    if (snapshot.ended) return@awaitEachGesture
+                    if (snapshot.ended || snapshot.aiToPlay) return@awaitEachGesture
                     val canvasW = size.width.toFloat()
                     val canvasH = size.height.toFloat()
                     fun layout() = BoardLayout(canvasW, canvasH, boardSize, showCoords)
@@ -440,7 +440,12 @@ fun BoardCanvas(
             val label = measurer.measure(formatScoreLoss(candidate.pointsLost), labelStyle)
             drawCandidate(layout.center(point), radius, fill, label)
         }
-        if (preview != null && snapshot.stoneAt(preview.x, preview.y) == null) {
+        if (
+            preview != null &&
+            !snapshot.ended &&
+            !snapshot.aiToPlay &&
+            snapshot.stoneAt(preview.x, preview.y) == null
+        ) {
             drawStone(snapshot.toPlay, appearance, layout.center(preview), stoneR, alpha = 0.42f)
         }
     }

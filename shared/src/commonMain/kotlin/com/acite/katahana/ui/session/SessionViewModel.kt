@@ -82,7 +82,9 @@ data class SessionUiState(
     val dirty: Boolean = false,
     val canSave: Boolean = false,
 ) {
-    val preview: Point? get() = selected ?: hover
+    /** Ghost stone under the pointer. Hidden when the human cannot place. */
+    val preview: Point?
+        get() = if (snapshot.ended || snapshot.aiToPlay) null else selected ?: hover
 }
 
 enum class SaveOutcome {
@@ -272,7 +274,9 @@ class SessionViewModel(
     }
 
     fun onHover(point: Point?) {
-        _state.update { it.copy(hover = point) }
+        val next = if (point != null && (session.tree.ended || isAiToPlay())) null else point
+        if (_state.value.hover == next) return
+        _state.update { it.copy(hover = next) }
     }
 
     fun onAim(point: Point?) {
