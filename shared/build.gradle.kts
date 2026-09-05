@@ -9,6 +9,73 @@ plugins {
     alias(libs.plugins.kotlinSerialization)
 }
 
+val generateHanaInfo by tasks.registering {
+    val version = providers.gradleProperty("hana.version").orElse("1.0")
+    val gitHash = providers.exec {
+        commandLine("git", "rev-parse", "--short", "HEAD")
+        workingDir(rootProject.rootDir)
+        isIgnoreExitValue = true
+    }.standardOutput.asText.map { it.trim().ifBlank { "dev" } }
+    val changelog = providers.exec {
+        commandLine("git", "log", "-n", "40", "--pretty=format:%h|%ad|%s", "--date=short")
+        workingDir(rootProject.rootDir)
+        isIgnoreExitValue = true
+    }.standardOutput.asText.map { it.trim() }
+    val outputDir = layout.buildDirectory.dir("generated/hanaInfo/kotlin")
+
+    inputs.property("version", version)
+    inputs.property("gitHash", gitHash)
+    inputs.property("changelog", changelog)
+    outputs.dir(outputDir)
+
+    doLast {
+        val dir = outputDir.get().asFile.resolve("com/acite/katahana/generated")
+        dir.mkdirs()
+        fun String.kotlinString(): String = buildString {
+            append('"')
+            for (ch in this@kotlinString) {
+                when (ch) {
+                    '\\' -> append("\\\\")
+                    '"' -> append("\\\"")
+                    '$' -> append("\\\$")
+                    '\n' -> append("\\n")
+                    '\r' -> append("\\r")
+                    '\t' -> append("\\t")
+                    else -> append(ch)
+                }
+            }
+            append('"')
+        }
+        val entries = changelog.get().lineSequence()
+            .map { it.trim() }
+            .filter { it.isNotEmpty() && it.count { c -> c == '|' } >= 2 }
+            .joinToString(",\n        ") { line ->
+                val first = line.indexOf('|')
+                val second = line.indexOf('|', first + 1)
+                val hash = line.substring(0, first)
+                val date = line.substring(first + 1, second)
+                val subject = line.substring(second + 1)
+                "ChangelogEntry(${hash.kotlinString()}, ${date.kotlinString()}, ${subject.kotlinString()})"
+            }
+        val body = buildString {
+            appendLine("package com.acite.katahana.generated")
+            appendLine()
+            appendLine("import com.acite.katahana.changelog.ChangelogEntry")
+            appendLine()
+            appendLine("object AppInfo {")
+            appendLine("    const val version: String = ${version.get().kotlinString()}")
+            appendLine("    const val gitHash: String = ${gitHash.get().kotlinString()}")
+            appendLine("    val changelog: List<ChangelogEntry> = listOf(")
+            if (entries.isNotEmpty()) {
+                appendLine("        $entries")
+            }
+            appendLine("    )")
+            appendLine("}")
+        }
+        dir.resolve("AppInfo.kt").writeText(body)
+    }
+}
+
 kotlin {
     listOf(
         iosArm64(),
@@ -62,25 +129,30 @@ kotlin {
         iosMain.dependencies {
             implementation(libs.ktor.client.darwin)
         }
-        commonMain.dependencies {
-            implementation(libs.compose.runtime)
-            implementation(libs.compose.foundation)
-            implementation(libs.compose.material3)
-            implementation(libs.compose.ui)
-            implementation(libs.compose.uiBackhandler)
-            implementation(libs.navigationevent.compose)
-            implementation(libs.compose.components.resources)
-            implementation(libs.compose.uiToolingPreview)
-            api(libs.metrox.viewmodel.compose)
-            implementation(libs.androidx.lifecycle.viewmodelCompose)
-            implementation(libs.androidx.lifecycle.runtimeCompose)
-            implementation(libs.kotlinx.coroutines.core)
-            implementation(libs.voyager.navigator)
-            implementation(libs.voyager.transitions)
-            implementation(libs.androidx.datastore.preferences.core)
-            implementation(libs.kotlinx.serialization.json)
-            implementation(libs.ktor.client.core)
-            implementation(libs.ktor.client.websockets)
+        commonMain {
+            kotlin.srcDir(generateHanaInfo.map { it.outputs.files.singleFile })
+            dependencies {
+                implementation(libs.compose.runtime)
+                implementation(libs.compose.foundation)
+                implementation(libs.compose.material3)
+                implementation(libs.compose.ui)
+                implementation(libs.compose.uiBackhandler)
+                implementation(libs.navigationevent.compose)
+                implementation(libs.compose.components.resources)
+                implementation(libs.compose.uiToolingPreview)
+                api(libs.metrox.viewmodel.compose)
+                implementation(libs.androidx.lifecycle.viewmodelCompose)
+                implementation(libs.androidx.lifecycle.runtimeCompose)
+                implementation(libs.kotlinx.coroutines.core)
+                implementation(libs.voyager.navigator)
+                implementation(libs.voyager.transitions)
+                implementation(libs.androidx.datastore.preferences.core)
+                implementation(libs.kotlinx.serialization.json)
+                implementation(libs.ktor.client.core)
+                implementation(libs.ktor.client.websockets)
+                implementation(libs.haze)
+                implementation(libs.haze.blur)
+            }
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)

@@ -40,6 +40,7 @@ fun CapsuleButton(
     modifier: Modifier = Modifier,
     emphasized: Boolean = false,
     enabled: Boolean = true,
+    compact: Boolean = false,
 ) {
     val tokens = hanaTokens
     Button(
@@ -52,9 +53,14 @@ fun CapsuleButton(
             disabledContainerColor = HanaColors.bgCard.copy(alpha = 0.5f),
             disabledContentColor = HanaColors.textDim,
         ),
-        modifier = modifier.height(52.dp),
+        contentPadding = if (compact) {
+            androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+        } else {
+            ButtonDefaults.ContentPadding
+        },
+        modifier = modifier.height(if (compact) 36.dp else 52.dp),
     ) {
-        Text(text, fontWeight = FontWeight.SemiBold)
+        Text(text, fontWeight = FontWeight.SemiBold, fontSize = if (compact) 13.sp else 14.sp)
     }
 }
 

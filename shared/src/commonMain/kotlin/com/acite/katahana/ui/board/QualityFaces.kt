@@ -17,11 +17,12 @@ fun DrawScope.drawQualityFace(center: Offset, stoneRadius: Float, band: QualityB
     val cap = StrokeCap.Round
     val join = StrokeJoin.Round
     val colorW = (r * 0.18f).coerceAtLeast(2.6f)
-    val haloW = (colorW + r * 0.07f).coerceAtLeast(colorW + 2.2f)
+    val extra = ((r * 0.07f).coerceAtLeast(2.2f)) * 0.40f
+    val haloW = colorW + extra
     val outline = FacePen(
         color = Color.White,
         stroke = Stroke(width = haloW, cap = cap, join = join),
-        pad = (haloW - colorW) * 0.5f,
+        pad = extra * 0.5f,
         fill = false,
     )
     val ink = FacePen(

@@ -65,6 +65,9 @@ class SettingsViewModel(
     val quality: StateFlow<QualityThresholds> = repo.quality.stateIn(
         viewModelScope, SharingStarted.WhileSubscribed(1_000), QualityThresholds(),
     )
+    val drawerAcrylic: StateFlow<Float> = repo.drawerAcrylic.stateIn(
+        viewModelScope, SharingStarted.WhileSubscribed(1_000), 0.55f,
+    )
     val lastGame: StateFlow<GameConfig> = repo.lastGame.stateIn(
         viewModelScope, SharingStarted.WhileSubscribed(1_000), GameConfig(),
     )
@@ -81,6 +84,7 @@ class SettingsViewModel(
     fun setPlayVisits(value: Int) = launch { repo.setPlayVisits(value) }
     fun setReviewVisits(value: Int) = launch { repo.setReviewVisits(value) }
     fun setQuality(value: QualityThresholds) = launch { repo.setQuality(value) }
+    fun setDrawerAcrylic(value: Float) = launch { repo.setDrawerAcrylic(value) }
 
     fun testConnection() {
         if (_testBusy.value) return

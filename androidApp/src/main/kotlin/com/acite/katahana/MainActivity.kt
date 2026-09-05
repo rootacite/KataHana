@@ -11,6 +11,8 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.acite.katahana.sgf.AndroidSgfFiles
 import com.acite.katahana.sgf.LocalSgfFiles
+import com.acite.katahana.ui.AppExit
+import com.acite.katahana.ui.LocalAppExit
 
 class MainActivity : ComponentActivity() {
     private lateinit var sgfFiles: AndroidSgfFiles
@@ -25,7 +27,10 @@ class MainActivity : ComponentActivity() {
         sgfFiles = AndroidSgfFiles(this)
         val appGraph = (application as KataHanaApp).graph
         setContent {
-            CompositionLocalProvider(LocalSgfFiles provides sgfFiles) {
+            CompositionLocalProvider(
+                LocalSgfFiles provides sgfFiles,
+                LocalAppExit provides AppExit { finishAffinity() },
+            ) {
                 App(appGraph.metroViewModelFactory)
             }
         }

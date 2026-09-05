@@ -24,8 +24,9 @@ import cafe.adriel.voyager.navigator.currentOrThrow
 import com.acite.katahana.ui.Copy
 import com.acite.katahana.ui.components.CapsuleButton
 import com.acite.katahana.ui.components.HanaField
+import com.acite.katahana.ui.components.HanaSection
+import com.acite.katahana.ui.components.ScreenHeader
 import com.acite.katahana.ui.session.engineStatusLabel
-import com.acite.katahana.ui.components.QuietTextButton
 import com.acite.katahana.ui.settings.SettingsViewModel
 import com.acite.katahana.ui.theme.HanaColors
 import dev.zacsweers.metrox.viewmodel.metroViewModel
@@ -55,52 +56,41 @@ private fun EngineSettingsRoute(vm: SettingsViewModel) {
             .imePadding()
             .verticalScroll(rememberScrollState())
             .padding(20.dp),
+        verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(22.dp),
     ) {
-        QuietTextButton(Copy.back) { navigator.pop() }
-        Text(Copy.engine, color = HanaColors.text, fontSize = 28.sp)
-        Spacer(Modifier.height(16.dp))
-        HanaField(Copy.engineName, name, vm::setEngineName)
-        Spacer(Modifier.height(10.dp))
-        HanaField(Copy.url, url, vm::setEngineUrl, placeholder = "ws://127.0.0.1:2080")
-        Spacer(Modifier.height(10.dp))
-        HanaField(Copy.token, token, vm::setEngineToken)
-        Spacer(Modifier.height(10.dp))
-        HanaField(
-            Copy.playVisits,
-            play.toString(),
-            onChange = { it.toIntOrNull()?.let(vm::setPlayVisits) },
-            keyboard = KeyboardType.Number,
-        )
-        Spacer(Modifier.height(10.dp))
-        HanaField(
-            Copy.reviewVisits,
-            review.toString(),
-            onChange = { it.toIntOrNull()?.let(vm::setReviewVisits) },
-            keyboard = KeyboardType.Number,
-        )
-        Spacer(Modifier.height(20.dp))
-        CapsuleButton(
-            if (testBusy) Copy.testingConnection else Copy.testConnection,
-            onClick = vm::testConnection,
-            modifier = Modifier.fillMaxWidth(),
-            enabled = !testBusy,
-        )
-        Spacer(Modifier.height(8.dp))
-        Text(
-            engineStatusLabel(engineStatus),
-            color = HanaColors.textDim,
-            fontSize = 13.sp,
-        )
-        if (testMessage != null) {
-            Spacer(Modifier.height(6.dp))
-            Text(testMessage.orEmpty(), color = HanaColors.accentLilac, fontSize = 13.sp)
+        ScreenHeader(Copy.engine, onBack = { navigator.pop() })
+        HanaSection(Copy.engine, hint = Copy.engineOfflineHint) {
+            HanaField(Copy.engineName, name, vm::setEngineName)
+            HanaField(Copy.url, url, vm::setEngineUrl, placeholder = "ws://127.0.0.1:2080")
+            HanaField(Copy.token, token, vm::setEngineToken)
+            HanaField(
+                Copy.playVisits,
+                play.toString(),
+                onChange = { it.toIntOrNull()?.let(vm::setPlayVisits) },
+                keyboard = KeyboardType.Number,
+            )
+            HanaField(
+                Copy.reviewVisits,
+                review.toString(),
+                onChange = { it.toIntOrNull()?.let(vm::setReviewVisits) },
+                keyboard = KeyboardType.Number,
+            )
+            CapsuleButton(
+                if (testBusy) Copy.testingConnection else Copy.testConnection,
+                onClick = vm::testConnection,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !testBusy,
+            )
+            Text(
+                engineStatusLabel(engineStatus),
+                color = HanaColors.textDim,
+                fontSize = 13.sp,
+            )
+            if (testMessage != null) {
+                Text(testMessage.orEmpty(), color = HanaColors.accentLilac, fontSize = 13.sp)
+            }
         }
         Spacer(Modifier.height(8.dp))
-        Text(
-            Copy.engineOfflineHint,
-            color = HanaColors.textDim,
-            fontSize = 13.sp,
-        )
     }
 }
 

@@ -8,6 +8,8 @@ import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import com.acite.katahana.sgf.JvmSgfFiles
 import com.acite.katahana.sgf.LocalSgfFiles
+import com.acite.katahana.ui.AppExit
+import com.acite.katahana.ui.LocalAppExit
 import dev.zacsweers.metro.createGraph
 import katahana.desktopapp.generated.resources.Res
 import katahana.desktopapp.generated.resources.app_icon
@@ -23,7 +25,10 @@ fun main() {
             state = rememberWindowState(width = 1280.dp, height = 800.dp),
         ) {
             val sgfFiles = remember { JvmSgfFiles() }
-            CompositionLocalProvider(LocalSgfFiles provides sgfFiles) {
+            CompositionLocalProvider(
+                LocalSgfFiles provides sgfFiles,
+                LocalAppExit provides AppExit { exitApplication() },
+            ) {
                 App(appGraph.metroViewModelFactory)
             }
         }

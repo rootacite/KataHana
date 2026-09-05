@@ -169,6 +169,11 @@ class SessionViewModel(
         SharingStarted.WhileSubscribed(1_000),
         OwnershipStyle.Default,
     )
+    val drawerAcrylic: StateFlow<Float> = settings.drawerAcrylic.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(1_000),
+        0.55f,
+    )
     val quality: StateFlow<QualityThresholds> = settings.quality.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(1_000),

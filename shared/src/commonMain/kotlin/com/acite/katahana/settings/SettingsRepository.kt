@@ -42,6 +42,9 @@ class SettingsRepository {
     val showConnections: Flow<Boolean> = dataStore.data.map { it[Keys.SHOW_CONNECTIONS] ?: false }
     val showOwnership: Flow<Boolean> = dataStore.data.map { it[Keys.SHOW_OWNERSHIP] ?: false }
     val showDeadStones: Flow<Boolean> = dataStore.data.map { it[Keys.SHOW_DEAD_STONES] ?: false }
+    val drawerAcrylic: Flow<Float> = dataStore.data.map {
+        (it[Keys.DRAWER_ACRYLIC] ?: 0.55f).coerceIn(0f, 1f)
+    }
     val ownershipStyle: Flow<OwnershipStyle> = dataStore.data.map {
         OwnershipStyle.fromId(it[Keys.OWNERSHIP_STYLE])
     }
@@ -92,6 +95,7 @@ class SettingsRepository {
     suspend fun setShowConnections(value: Boolean) = edit { it[Keys.SHOW_CONNECTIONS] = value }
     suspend fun setShowOwnership(value: Boolean) = edit { it[Keys.SHOW_OWNERSHIP] = value }
     suspend fun setShowDeadStones(value: Boolean) = edit { it[Keys.SHOW_DEAD_STONES] = value }
+    suspend fun setDrawerAcrylic(value: Float) = edit { it[Keys.DRAWER_ACRYLIC] = value.coerceIn(0f, 1f) }
     suspend fun setOwnershipStyle(value: OwnershipStyle) = edit { it[Keys.OWNERSHIP_STYLE] = value.id }
     suspend fun setAppearanceId(value: String) = edit { it[Keys.APPEARANCE] = value }
     suspend fun setEngineName(value: String) = edit { it[Keys.ENGINE_NAME] = value }
@@ -128,6 +132,7 @@ class SettingsRepository {
         val SHOW_CONNECTIONS = booleanPreferencesKey("show_connections")
         val SHOW_OWNERSHIP = booleanPreferencesKey("show_ownership")
         val SHOW_DEAD_STONES = booleanPreferencesKey("show_dead_stones")
+        val DRAWER_ACRYLIC = floatPreferencesKey("drawer_acrylic")
         val OWNERSHIP_STYLE = stringPreferencesKey("ownership_style")
         val APPEARANCE = stringPreferencesKey("appearance")
         val ENGINE_NAME = stringPreferencesKey("engine_name")

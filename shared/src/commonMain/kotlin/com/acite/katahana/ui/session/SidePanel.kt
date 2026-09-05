@@ -80,11 +80,8 @@ fun SidePanel(
     onBack: (() -> Unit)? = null,
     onSettings: (() -> Unit)? = null,
 ) {
-    val tokens = hanaTokens
     Column(
         modifier = modifier
-            .clip(tokens.card)
-            .background(HanaColors.bgPanel)
             .verticalScroll(rememberScrollState())
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -113,22 +110,16 @@ fun SidePanel(
             Text(Copy.twoPasses, color = HanaColors.accentPink, fontSize = 14.sp)
         }
         val humanTurn = !aiThinking && !snapshot.ended && !snapshot.aiToPlay
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-            CapsuleButton(Copy.pass, onPass, modifier = Modifier.weight(1f), enabled = humanTurn)
-            CapsuleButton(Copy.undo, onUndo, modifier = Modifier.weight(1f), enabled = snapshot.canUndo)
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-            CapsuleButton(Copy.redo, onRedo, modifier = Modifier.weight(1f), enabled = snapshot.canRedo)
-            if (hasSelection) {
-                CapsuleButton(
-                    Copy.confirm,
-                    onConfirm,
-                    modifier = Modifier.weight(1f),
-                    emphasized = true,
-                    enabled = humanTurn,
-                )
-            }
-        }
+        PlayActionsBar(
+            snapshot = snapshot,
+            hasSelection = hasSelection,
+            humanTurn = humanTurn,
+            onPass = onPass,
+            onUndo = onUndo,
+            onRedo = onRedo,
+            onConfirm = onConfirm,
+            compact = true,
+        )
         if (snapshot.variationCount > 1) {
             VariationRow(snapshot.variationIndex, snapshot.variationCount, onCycleVariation)
         }

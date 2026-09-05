@@ -1,15 +1,8 @@
 package com.acite.katahana.ui.session
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -21,7 +14,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -33,7 +25,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -43,6 +34,7 @@ import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import com.acite.katahana.domain.GameConfig
 import com.acite.katahana.domain.GameTree
+import com.acite.katahana.domain.SessionSnapshot
 import com.acite.katahana.engine.EnginePhase
 import com.acite.katahana.getPlatform
 import com.acite.katahana.engine.EngineStatus
@@ -58,6 +50,8 @@ import com.acite.katahana.ui.navigation.HanaBackHandler
 import com.acite.katahana.ui.settings.SettingsScreen
 import com.acite.katahana.ui.theme.HanaColors
 import com.acite.katahana.ui.theme.hanaTokens
+import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.rememberHazeState
 import dev.zacsweers.metrox.viewmodel.assistedMetroViewModel
 import kotlin.random.Random
 import kotlinx.coroutines.launch
@@ -92,6 +86,7 @@ private fun SessionRoute(vm: SessionViewModel) {
     val showOwnership by vm.showOwnership.collectAsState()
     val showDeadStones by vm.showDeadStones.collectAsState()
     val ownershipStyle by vm.ownershipStyle.collectAsState()
+    val drawerAcrylic by vm.drawerAcrylic.collectAsState()
     val navigator = LocalNavigator.currentOrThrow
     val snapshot = ui.snapshot
     val boardCandidates = if (showCandidates) ui.candidates else emptyList()
@@ -148,6 +143,8 @@ private fun SessionRoute(vm: SessionViewModel) {
     ) {
         val landscape = getPlatform().isMobile && maxWidth > maxHeight
         val chromePad = if (landscape) 4.dp else 8.dp
+        val humanTurn = !ui.aiThinking && !snapshot.ended && !snapshot.aiToPlay
+        val hazeState = rememberHazeState()
         Column(Modifier.fillMaxSize().padding(top = chromePad)) {
             SessionTopBar(
                 status = ui.engineStatus,
@@ -155,58 +152,20 @@ private fun SessionRoute(vm: SessionViewModel) {
                 reviewing = snapshot.reviewing,
                 compact = landscape,
                 onMenu = { drawerOpen = true },
+                snapshot = snapshot,
+                hasSelection = ui.selected != null,
+                humanTurn = humanTurn,
+                onPass = vm::pass,
+                onUndo = vm::undo,
+                onRedo = vm::redo,
+                onConfirm = vm::confirmSelected,
             )
-            Box(Modifier.weight(1f).fillMaxWidth()) {
-                BoxWithConstraints(Modifier.fillMaxSize().padding(chromePad)) {
-                    val boardSide = minOf(maxWidth, maxHeight).coerceAtLeast(120.dp)
-                    val leftover = maxWidth - boardSide
-                    val showSideTree = leftover >= 168.dp
-                    val board: @Composable () -> Unit = {
-                        BoardCanvas(
-                            snapshot = snapshot,
-                            showCoords = coords,
-                            preview = ui.preview,
-                            onHover = vm::onHover,
-                            onActivate = vm::onActivate,
-                            modifier = Modifier.size(boardSide),
-                            candidates = boardCandidates,
-                            qualities = boardQualities,
-                            showConnections = showConnections,
-                            ownership = ui.ownership,
-                            showOwnership = showOwnership,
-                            ownershipStyle = ownershipStyle,
-                            deadPoints = if (showDeadStones) ui.deadPoints else emptySet(),
-                        )
-                    }
-                    if (showSideTree) {
-                        Row(
-                            Modifier.fillMaxSize(),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            GameTreeCard(
-                                layout = ui.tree,
-                                reviewing = snapshot.reviewing,
-                                onGoToNode = vm::goToNode,
-                                compact = true,
-                                modifier = Modifier
-                                    .width(leftover.coerceAtMost(280.dp))
-                                    .fillMaxHeight()
-                                    .padding(end = chromePad),
-                            )
-                            Box(
-                                Modifier.weight(1f).fillMaxHeight(),
-                                contentAlignment = Alignment.Center,
-                            ) { board() }
-                        }
-                    } else {
-                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { board() }
-                    }
-                }
-                SessionDrawerOverlay(
-                    open = drawerOpen,
-                    onOpen = { drawerOpen = true },
-                    onClose = { drawerOpen = false },
-                ) {
+            HanaDrawer(
+                open = drawerOpen,
+                onOpenChange = { drawerOpen = it },
+                acrylic = drawerAcrylic,
+                hazeState = hazeState,
+                drawerContent = {
                     SidePanel(
                         snapshot = snapshot,
                         hasSelection = ui.selected != null,
@@ -252,6 +211,60 @@ private fun SessionRoute(vm: SessionViewModel) {
                         },
                         modifier = Modifier.fillMaxSize(),
                     )
+                },
+            ) {
+                BoxWithConstraints(
+                    Modifier
+                        .fillMaxSize()
+                        .hazeSource(hazeState)
+                        .padding(chromePad),
+                ) {
+                    val boardSide = minOf(maxWidth, maxHeight).coerceAtLeast(120.dp)
+                    val leftover = maxWidth - boardSide
+                    val showSideTree = leftover >= 168.dp
+                    val board: @Composable () -> Unit = {
+                        BoardCanvas(
+                            snapshot = snapshot,
+                            showCoords = coords,
+                            preview = ui.preview,
+                            onHover = vm::onHover,
+                            onActivate = vm::onActivate,
+                            modifier = Modifier.size(boardSide),
+                            candidates = boardCandidates,
+                            qualities = boardQualities,
+                            showConnections = showConnections,
+                            ownership = ui.ownership,
+                            showOwnership = showOwnership,
+                            ownershipStyle = ownershipStyle,
+                            deadPoints = if (showDeadStones) ui.deadPoints else emptySet(),
+                        )
+                    }
+                    if (showSideTree) {
+                        Row(
+                            Modifier.fillMaxSize(),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            GameTreeCard(
+                                layout = ui.tree,
+                                reviewing = snapshot.reviewing,
+                                onGoToNode = vm::goToNode,
+                                compact = true,
+                                modifier = Modifier
+                                    .width(leftover.coerceAtMost(280.dp))
+                                    .fillMaxHeight()
+                                    .padding(end = chromePad),
+                            )
+                            Box(
+                                Modifier.weight(1f).fillMaxHeight(),
+                                contentAlignment = Alignment.Center,
+                            ) { board() }
+                        }
+                    } else {
+                        Box(
+                            Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center,
+                        ) { board() }
+                    }
                 }
             }
         }
@@ -277,22 +290,53 @@ internal fun SessionTopBar(
     status: EngineStatus,
     blackWinrate: Float?,
     onMenu: () -> Unit,
+    snapshot: SessionSnapshot,
+    hasSelection: Boolean,
+    humanTurn: Boolean,
+    onPass: () -> Unit,
+    onUndo: () -> Unit,
+    onRedo: () -> Unit,
+    onConfirm: () -> Unit,
     reviewing: Boolean = false,
     compact: Boolean = false,
 ) {
     Row(
         Modifier
             .fillMaxWidth()
-            .then(if (compact) Modifier else Modifier.height(44.dp))
+            .height(44.dp)
             .padding(horizontal = if (compact) 4.dp else 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         EngineDot(online = status.online)
-        Spacer(Modifier.width(if (compact) 6.dp else 10.dp))
+        Spacer(Modifier.width(if (compact) 6.dp else 8.dp))
+        if (compact) {
+            Text(
+                Copy.menu,
+                color = HanaColors.accentLilac,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier
+                    .clip(hanaTokens.capsule)
+                    .clickable(onClick = onMenu)
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+            )
+        } else {
+            QuietTextButton(Copy.menu, onClick = onMenu)
+        }
+        Spacer(Modifier.width(if (compact) 6.dp else 8.dp))
         WinrateTrack(
             Modifier.weight(1f).padding(end = 4.dp),
             blackWinrate = blackWinrate,
             enabled = status.online,
+        )
+        PlayIconCluster(
+            snapshot = snapshot,
+            hasSelection = hasSelection,
+            humanTurn = humanTurn,
+            onPass = onPass,
+            onUndo = onUndo,
+            onRedo = onRedo,
+            onConfirm = onConfirm,
         )
         if (reviewing) {
             Box(
@@ -312,84 +356,7 @@ internal fun SessionTopBar(
                     fontWeight = FontWeight.SemiBold,
                 )
             }
-            Spacer(Modifier.width(4.dp))
         }
-        if (compact) {
-            Text(
-                Copy.menu,
-                color = HanaColors.accentLilac,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier
-                    .clip(hanaTokens.capsule)
-                    .clickable(onClick = onMenu)
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
-            )
-        } else {
-            QuietTextButton(Copy.menu, onClick = onMenu)
-        }
-    }
-}
-
-@Composable
-private fun BoxScope.SessionDrawerOverlay(
-    open: Boolean,
-    onOpen: () -> Unit,
-    onClose: () -> Unit,
-    content: @Composable () -> Unit,
-) {
-    if (!open) {
-        DrawerHandle(
-            modifier = Modifier.align(Alignment.CenterEnd),
-            onClick = onOpen,
-        )
-    }
-    androidx.compose.animation.AnimatedVisibility(
-        visible = open,
-        enter = fadeIn(),
-        exit = fadeOut(),
-    ) {
-        Box(
-            Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.45f))
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    onClick = onClose,
-                ),
-        )
-    }
-    androidx.compose.animation.AnimatedVisibility(
-        visible = open,
-        modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(300.dp),
-        enter = slideInHorizontally { it },
-        exit = slideOutHorizontally { it },
-    ) {
-        content()
-    }
-}
-
-@Composable
-private fun DrawerHandle(onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val tokens = hanaTokens
-    Box(
-        modifier
-            .padding(end = 4.dp)
-            .width(18.dp)
-            .height(72.dp)
-            .clip(RoundedCornerShape(topStart = 14.dp, bottomStart = 14.dp))
-            .background(HanaColors.bgPanel)
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Box(
-            Modifier
-                .width(3.dp)
-                .height(28.dp)
-                .clip(tokens.capsule)
-                .background(HanaColors.accentPink.copy(alpha = 0.85f)),
-        )
     }
 }
 

@@ -23,6 +23,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -48,7 +50,8 @@ import com.acite.katahana.ui.board.drawOwnershipLayer
 import com.acite.katahana.ui.board.drawStoneSwatch
 import com.acite.katahana.domain.Point
 import com.acite.katahana.ui.components.HanaField
-import com.acite.katahana.ui.components.QuietTextButton
+import com.acite.katahana.ui.components.HanaSection
+import com.acite.katahana.ui.components.ScreenHeader
 import com.acite.katahana.ui.theme.Appearance
 import com.acite.katahana.ui.theme.HanaColors
 import com.acite.katahana.ui.theme.StoneSwatch
@@ -70,6 +73,7 @@ private fun SettingsRoute(vm: SettingsViewModel) {
     val appearanceId by vm.appearanceId.collectAsState()
     val ownershipStyle by vm.ownershipStyle.collectAsState()
     val quality by vm.quality.collectAsState()
+    val acrylic by vm.drawerAcrylic.collectAsState()
     val tokens = hanaTokens
 
     Column(
@@ -79,31 +83,26 @@ private fun SettingsRoute(vm: SettingsViewModel) {
             .imePadding()
             .verticalScroll(rememberScrollState())
             .padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(22.dp),
     ) {
-        QuietTextButton(Copy.back) { navigator.pop() }
-        Text(Copy.settings, color = HanaColors.text, fontSize = 28.sp)
-        Spacer(Modifier.height(20.dp))
-        Text(Copy.appearance, color = HanaColors.text, fontSize = 18.sp)
-        Spacer(Modifier.height(4.dp))
-        Text(Copy.appearanceHint, color = HanaColors.textDim, fontSize = 13.sp)
-        Spacer(Modifier.height(12.dp))
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        ScreenHeader(Copy.settings, onBack = { navigator.pop() })
+        HanaSection(Copy.appearance, hint = Copy.appearanceHint) {
             Appearance.all.forEach { appearance ->
                 val selected = appearance.id == appearanceId
                 Row(
                     Modifier
                         .fillMaxWidth()
-                        .clip(tokens.card)
-                        .background(HanaColors.bgCard)
+                        .clip(tokens.panel)
+                        .background(HanaColors.bgPanel)
                         .then(
                             if (selected) {
-                                Modifier.border(1.5.dp, HanaColors.accentPink, tokens.card)
+                                Modifier.border(1.5.dp, HanaColors.accentPink, tokens.panel)
                             } else {
-                                Modifier.border(1.dp, HanaColors.stroke, tokens.card)
+                                Modifier.border(1.dp, HanaColors.stroke, tokens.panel)
                             },
                         )
                         .clickable { vm.setAppearanceId(appearance.id) }
-                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     StonePairPreview(appearance)
@@ -115,24 +114,40 @@ private fun SettingsRoute(vm: SettingsViewModel) {
                 }
             }
         }
-        Spacer(Modifier.height(24.dp))
-        Text(Copy.ownershipStyle, color = HanaColors.text, fontSize = 18.sp)
-        Spacer(Modifier.height(4.dp))
-        Text(Copy.ownershipStyleHint, color = HanaColors.textDim, fontSize = 13.sp)
-        Spacer(Modifier.height(12.dp))
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        HanaSection(Copy.drawerFrost, hint = Copy.drawerFrostHint) {
+            Text(
+                "${(acrylic * 100f).toInt()}%",
+                color = HanaColors.accentLilac,
+                fontSize = 13.sp,
+            )
+            Slider(
+                value = acrylic,
+                onValueChange = vm::setDrawerAcrylic,
+                valueRange = 0f..1f,
+                colors = SliderDefaults.colors(
+                    thumbColor = HanaColors.accentPink,
+                    activeTrackColor = HanaColors.accentPink,
+                    inactiveTrackColor = HanaColors.stroke,
+                ),
+            )
+        }
+        HanaSection(Copy.boardSection) {
+            ToggleRow(Copy.confirmMove, confirm, vm::setConfirmMove)
+            ToggleRow(Copy.showCoords, coords, vm::setShowCoords)
+        }
+        HanaSection(Copy.ownershipStyle, hint = Copy.ownershipStyleHint) {
             OwnershipStyle.entries.forEach { style ->
                 val selected = style == ownershipStyle
                 Row(
                     Modifier
                         .fillMaxWidth()
-                        .clip(tokens.card)
-                        .background(HanaColors.bgCard)
+                        .clip(tokens.panel)
+                        .background(HanaColors.bgPanel)
                         .then(
                             if (selected) {
-                                Modifier.border(1.5.dp, HanaColors.accentPink, tokens.card)
+                                Modifier.border(1.5.dp, HanaColors.accentPink, tokens.panel)
                             } else {
-                                Modifier.border(1.dp, HanaColors.stroke, tokens.card)
+                                Modifier.border(1.dp, HanaColors.stroke, tokens.panel)
                             },
                         )
                         .clickable { vm.setOwnershipStyle(style) }
@@ -148,30 +163,24 @@ private fun SettingsRoute(vm: SettingsViewModel) {
                 }
             }
         }
-        Spacer(Modifier.height(24.dp))
-        ToggleRow(Copy.confirmMove, confirm, vm::setConfirmMove)
+        HanaSection(Copy.quality, hint = Copy.qualityHint) {
+            ThresholdField("Blunder (≥ purple)", quality.blunder) {
+                vm.setQuality(quality.copy(blunder = it))
+            }
+            ThresholdField("Big mistake", quality.bigMistake) {
+                vm.setQuality(quality.copy(bigMistake = it))
+            }
+            ThresholdField("Mistake", quality.mistake) {
+                vm.setQuality(quality.copy(mistake = it))
+            }
+            ThresholdField("Inaccuracy", quality.inaccuracy) {
+                vm.setQuality(quality.copy(inaccuracy = it))
+            }
+            ThresholdField("Fair", quality.fair) {
+                vm.setQuality(quality.copy(fair = it))
+            }
+        }
         Spacer(Modifier.height(8.dp))
-        ToggleRow(Copy.showCoords, coords, vm::setShowCoords)
-        Spacer(Modifier.height(24.dp))
-        Text(Copy.quality, color = HanaColors.text, fontSize = 18.sp)
-        Spacer(Modifier.height(4.dp))
-        Text(Copy.qualityHint, color = HanaColors.textDim, fontSize = 13.sp)
-        Spacer(Modifier.height(12.dp))
-        ThresholdField("Blunder (≥ purple)", quality.blunder) {
-            vm.setQuality(quality.copy(blunder = it))
-        }
-        ThresholdField("Big mistake", quality.bigMistake) {
-            vm.setQuality(quality.copy(bigMistake = it))
-        }
-        ThresholdField("Mistake", quality.mistake) {
-            vm.setQuality(quality.copy(mistake = it))
-        }
-        ThresholdField("Inaccuracy", quality.inaccuracy) {
-            vm.setQuality(quality.copy(inaccuracy = it))
-        }
-        ThresholdField("Fair", quality.fair) {
-            vm.setQuality(quality.copy(fair = it))
-        }
     }
 }
 
@@ -312,5 +321,4 @@ private fun ThresholdField(label: String, value: Float, onChange: (Float) -> Uni
         onChange = { it.toFloatOrNull()?.let(onChange) },
         keyboard = KeyboardType.Decimal,
     )
-    Spacer(Modifier.height(8.dp))
 }

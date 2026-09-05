@@ -35,13 +35,19 @@ fun NewGameSheet(
     onStart: (GameConfig) -> Unit,
     modifier: Modifier = Modifier,
     initial: GameConfig = GameConfig(),
+    lockedMode: PlayMode? = null,
 ) {
     var size by remember(initial) { mutableIntStateOf(initial.boardSize) }
     var komi by remember(initial) { mutableStateOf(initial.komi) }
-    var mode by remember(initial) { mutableStateOf(initial.mode) }
+    var mode by remember(initial, lockedMode) { mutableStateOf(lockedMode ?: initial.mode) }
     var rankKyu by remember(initial) { mutableIntStateOf(initial.rankKyu) }
     var humanPlaysBlack by remember(initial) { mutableStateOf(initial.humanPlaysBlack) }
     var aiStyle by remember(initial) { mutableStateOf(initial.aiStyle) }
+    val title = when (lockedMode) {
+        PlayMode.HumanVsHuman -> Copy.hvh
+        PlayMode.HumanVsAi -> Copy.humanVsKatago
+        null -> Copy.newGame
+    }
 
     Column(
         modifier = modifier
@@ -49,7 +55,7 @@ fun NewGameSheet(
             .padding(horizontal = 20.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Text(Copy.newGame, color = HanaColors.text, fontSize = 22.sp)
+        Text(title, color = HanaColors.text, fontSize = 22.sp)
         Label(Copy.boardSize)
         ChoiceRow {
             for (n in listOf(9, 13, 19)) {
@@ -72,10 +78,12 @@ fun NewGameSheet(
                 )
             }
         }
-        Label(Copy.match)
-        ChoiceRow {
-            CapsuleChoice(Copy.hvh, mode == PlayMode.HumanVsHuman, { mode = PlayMode.HumanVsHuman }, Modifier.weight(1f))
-            CapsuleChoice(Copy.hvai, mode == PlayMode.HumanVsAi, { mode = PlayMode.HumanVsAi }, Modifier.weight(1f))
+        if (lockedMode == null) {
+            Label(Copy.match)
+            ChoiceRow {
+                CapsuleChoice(Copy.hvh, mode == PlayMode.HumanVsHuman, { mode = PlayMode.HumanVsHuman }, Modifier.weight(1f))
+                CapsuleChoice(Copy.humanVsKatago, mode == PlayMode.HumanVsAi, { mode = PlayMode.HumanVsAi }, Modifier.weight(1f))
+            }
         }
         if (mode == PlayMode.HumanVsAi) {
             Label(Copy.aiStyle)

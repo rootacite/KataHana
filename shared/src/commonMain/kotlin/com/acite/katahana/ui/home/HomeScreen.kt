@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -15,7 +16,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
@@ -33,26 +33,39 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
+import com.acite.katahana.changelog.ChangelogEntry
+import com.acite.katahana.domain.PlayMode
 import com.acite.katahana.epochMillis
+import com.acite.katahana.generated.AppInfo
 import com.acite.katahana.recents.RecentGame
 import com.acite.katahana.recents.formatSavedAt
 import com.acite.katahana.sgf.LocalSgfFiles
 import com.acite.katahana.sgf.parseSgf
 import com.acite.katahana.ui.Copy
-import com.acite.katahana.ui.components.CapsuleButton
+import com.acite.katahana.ui.LocalAppExit
+import com.acite.katahana.ui.components.BrandMark
+import com.acite.katahana.ui.components.HomeNavTile
+import com.acite.katahana.ui.components.PorcelainCard
 import com.acite.katahana.ui.components.QuietTextButton
 import com.acite.katahana.ui.engine.EngineSettingsScreen
 import com.acite.katahana.ui.session.SessionScreen
 import com.acite.katahana.ui.settings.SettingsScreen
 import com.acite.katahana.ui.theme.HanaColors
 import com.acite.katahana.ui.theme.hanaTokens
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.rememberHazeState
 import dev.zacsweers.metrox.viewmodel.metroViewModel
 import kotlinx.coroutines.launch
 
@@ -67,13 +80,22 @@ class HomeScreen : Screen {
 @Composable
 private fun HomeRoute() {
     val navigator = LocalNavigator.currentOrThrow
-    var showNew by remember { mutableStateOf(false) }
+    var newMode by remember { mutableStateOf<PlayMode?>(null) }
     val tokens = hanaTokens
     val sgfFiles = LocalSgfFiles.current
+    val appExit = LocalAppExit.current
     val scope = rememberCoroutineScope()
     val homeVm = metroViewModel<HomeViewModel>()
     val lastGame by homeVm.lastGame.collectAsState()
     val recents by homeVm.recentGames.collectAsState()
+
+    val openSgf: () -> Unit = {
+        scope.launch {
+            val text = sgfFiles.open() ?: return@launch
+            val game = runCatching { parseSgf(text) }.getOrNull() ?: return@launch
+            navigator.push(SessionScreen(game.config, game.tree))
+        }
+    }
 
     BoxWithConstraints(
         Modifier
@@ -81,119 +103,78 @@ private fun HomeRoute() {
             .background(HanaColors.bgApp),
     ) {
         val landscape = maxWidth > maxHeight
-        Box(Modifier.fillMaxSize()) {
-            Box(
+        val wide = maxWidth >= 840.dp
+        val hazeState = rememberHazeState()
+        Box(
+            Modifier
+                .fillMaxSize()
+                .hazeSource(hazeState),
+        ) {
+            GlowOrbs()
+        }
+        if (wide) {
+            Row(
                 Modifier
-                    .size(220.dp)
-                    .offset((-48).dp, (-24).dp)
-                    .clip(CircleShape)
-                    .background(HanaColors.accentPink.copy(alpha = 0.16f)),
-            )
-            Box(
-                Modifier
-                    .size(180.dp)
-                    .align(Alignment.TopEnd)
-                    .offset(x = 36.dp, y = 40.dp)
-                    .clip(CircleShape)
-                    .background(HanaColors.accentBlue.copy(alpha = 0.14f)),
-            )
-            Box(
-                Modifier
-                    .size(120.dp)
-                    .align(Alignment.BottomStart)
-                    .offset(x = 24.dp, y = (-80).dp)
-                    .clip(CircleShape)
-                    .background(HanaColors.accentLilac.copy(alpha = 0.12f)),
-            )
+                    .fillMaxSize()
+                    .padding(28.dp),
+                horizontalArrangement = Arrangement.spacedBy(22.dp),
+            ) {
+                HomeRail(
+                    hazeState = hazeState,
+                    modifier = Modifier
+                        .width(260.dp)
+                        .fillMaxHeight()
+                        .verticalScroll(rememberScrollState()),
+                    onHuman = { newMode = PlayMode.HumanVsHuman },
+                    onKatago = { newMode = PlayMode.HumanVsAi },
+                    onLoad = openSgf,
+                    onEngine = { navigator.push(EngineSettingsScreen()) },
+                    onSettings = { navigator.push(SettingsScreen()) },
+                    onQuit = { appExit.exit() },
+                )
+                Column(
+                    Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    RecentSection(hazeState, recents, homeVm, navigator)
+                    ChangelogSection(hazeState)
+                }
+            }
+        } else {
             Column(
                 Modifier
-                    .widthIn(max = 520.dp)
-                    .align(Alignment.Center)
+                    .fillMaxSize()
                     .verticalScroll(rememberScrollState())
-                    .padding(24.dp),
+                    .padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                Text(
-                    Copy.appName,
-                    color = HanaColors.text,
-                    fontSize = 44.sp,
-                    lineHeight = 48.sp,
+                PorcelainCard(hazeState) { BrandMark(compact = true) }
+                HomeActionGrid(
+                    hazeState = hazeState,
+                    onHuman = { newMode = PlayMode.HumanVsHuman },
+                    onKatago = { newMode = PlayMode.HumanVsAi },
+                    onLoad = openSgf,
+                    onEngine = { navigator.push(EngineSettingsScreen()) },
+                    onSettings = { navigator.push(SettingsScreen()) },
+                    onQuit = { appExit.exit() },
                 )
-                Text(
-                    Copy.tagline,
-                    color = HanaColors.accentLilac,
-                    fontSize = 16.sp,
-                )
-                Spacer(Modifier.height(28.dp))
-                CapsuleButton(
-                    Copy.newGame,
-                    onClick = { showNew = true },
-                    modifier = Modifier.fillMaxWidth(),
-                    emphasized = true,
-                )
-                Spacer(Modifier.height(10.dp))
-                CapsuleButton(
-                    Copy.openRecord,
-                    onClick = {
-                        scope.launch {
-                            val text = sgfFiles.open() ?: return@launch
-                            val game = runCatching { parseSgf(text) }.getOrNull() ?: return@launch
-                            navigator.push(SessionScreen(game.config, game.tree))
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Spacer(Modifier.height(28.dp))
-                Text(Copy.recent, color = HanaColors.text, fontSize = 16.sp)
-                Spacer(Modifier.height(10.dp))
-                if (recents.isEmpty()) {
-                    Box(
-                        Modifier
-                            .fillMaxWidth()
-                            .clip(tokens.card)
-                            .background(HanaColors.bgCard)
-                            .padding(18.dp),
-                    ) {
-                        Text(Copy.noRecent, color = HanaColors.textDim, fontSize = 14.sp)
-                    }
-                } else {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        recents.forEach { game ->
-                            RecentGameCard(
-                                game = game,
-                                now = epochMillis(),
-                                onOpen = {
-                                    val loaded = homeVm.openRecent(game.id) ?: return@RecentGameCard
-                                    navigator.push(
-                                        SessionScreen(
-                                            config = loaded.config,
-                                            loadedTree = loaded.tree,
-                                            recentId = loaded.record.id,
-                                            recentTitle = loaded.record.title,
-                                        ),
-                                    )
-                                },
-                                onRemove = { homeVm.removeRecent(game.id) },
-                            )
-                        }
-                    }
-                }
-                Spacer(Modifier.height(20.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    QuietTextButton(Copy.engine) { navigator.push(EngineSettingsScreen()) }
-                    QuietTextButton(Copy.settings) { navigator.push(SettingsScreen()) }
-                }
+                RecentSection(hazeState, recents, homeVm, navigator)
+                ChangelogSection(hazeState)
             }
         }
 
-        if (showNew) {
+        if (newMode != null) {
             val start: (com.acite.katahana.domain.GameConfig) -> Unit = { config ->
                 homeVm.saveLastGame(config)
-                showNew = false
+                newMode = null
                 navigator.push(SessionScreen(config))
             }
             if (!landscape) {
                 ModalBottomSheet(
-                    onDismissRequest = { showNew = false },
+                    onDismissRequest = { newMode = null },
                     sheetState = rememberBottomSheetState(
                         initialValue = SheetValue.Hidden,
                         enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
@@ -201,10 +182,10 @@ private fun HomeRoute() {
                     containerColor = HanaColors.bgPanel,
                     shape = tokens.sheet,
                 ) {
-                    NewGameSheet(onStart = start, initial = lastGame)
+                    NewGameSheet(onStart = start, initial = lastGame, lockedMode = newMode)
                 }
             } else {
-                Dialog(onDismissRequest = { showNew = false }) {
+                Dialog(onDismissRequest = { newMode = null }) {
                     Box(
                         Modifier
                             .width(420.dp)
@@ -212,11 +193,197 @@ private fun HomeRoute() {
                             .background(HanaColors.bgPanel)
                             .padding(8.dp),
                     ) {
-                        NewGameSheet(onStart = start, initial = lastGame)
+                        NewGameSheet(onStart = start, initial = lastGame, lockedMode = newMode)
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun GlowOrbs() {
+    Box(Modifier.fillMaxSize()) {
+        Box(
+            Modifier
+                .size(360.dp)
+                .offset((-100).dp, (-80).dp)
+                .blur(72.dp)
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(
+                            HanaColors.accentPink.copy(alpha = 0.55f),
+                            HanaColors.accentPink.copy(alpha = 0.16f),
+                            Color.Transparent,
+                        ),
+                    ),
+                    CircleShape,
+                ),
+        )
+        Box(
+            Modifier
+                .size(320.dp)
+                .align(Alignment.TopEnd)
+                .offset(x = 90.dp, y = 10.dp)
+                .blur(80.dp)
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(
+                            HanaColors.accentBlue.copy(alpha = 0.48f),
+                            HanaColors.accentBlue.copy(alpha = 0.14f),
+                            Color.Transparent,
+                        ),
+                    ),
+                    CircleShape,
+                ),
+        )
+        Box(
+            Modifier
+                .size(280.dp)
+                .align(Alignment.BottomStart)
+                .offset(x = (-30).dp, y = 50.dp)
+                .blur(84.dp)
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(
+                            HanaColors.accentLilac.copy(alpha = 0.42f),
+                            HanaColors.accentLilac.copy(alpha = 0.12f),
+                            Color.Transparent,
+                        ),
+                    ),
+                    CircleShape,
+                ),
+        )
+    }
+}
+
+@Composable
+private fun HomeRail(
+    hazeState: HazeState,
+    onHuman: () -> Unit,
+    onKatago: () -> Unit,
+    onLoad: () -> Unit,
+    onEngine: () -> Unit,
+    onSettings: () -> Unit,
+    onQuit: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        PorcelainCard(hazeState) { BrandMark() }
+        PorcelainCard(hazeState, title = Copy.play) {
+            HomeNavTile(Copy.hvh, onHuman, modifier = Modifier.fillMaxWidth(), accent = HanaColors.accentPink, emphasized = true)
+            HomeNavTile(Copy.humanVsKatago, onKatago, modifier = Modifier.fillMaxWidth(), accent = HanaColors.accentBlue, emphasized = true)
+            HomeNavTile(Copy.loadGame, onLoad, modifier = Modifier.fillMaxWidth(), accent = HanaColors.accentLilac)
+        }
+        PorcelainCard(hazeState, title = Copy.app) {
+            HomeNavTile(Copy.engine, onEngine, modifier = Modifier.fillMaxWidth(), accent = HanaColors.accentBlue)
+            HomeNavTile(Copy.settings, onSettings, modifier = Modifier.fillMaxWidth(), accent = HanaColors.accentLilac)
+            HomeNavTile(Copy.quit, onQuit, modifier = Modifier.fillMaxWidth(), accent = HanaColors.textDim)
+        }
+    }
+}
+
+@Composable
+private fun HomeActionGrid(
+    hazeState: HazeState,
+    onHuman: () -> Unit,
+    onKatago: () -> Unit,
+    onLoad: () -> Unit,
+    onEngine: () -> Unit,
+    onSettings: () -> Unit,
+    onQuit: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        PorcelainCard(hazeState, title = Copy.play) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                HomeNavTile(Copy.hvh, onHuman, Modifier.weight(1f), HanaColors.accentPink, emphasized = true)
+                HomeNavTile(Copy.humanVsKatago, onKatago, Modifier.weight(1f), HanaColors.accentBlue, emphasized = true)
+            }
+            HomeNavTile(Copy.loadGame, onLoad, Modifier.fillMaxWidth(), HanaColors.accentLilac)
+        }
+        PorcelainCard(hazeState, title = Copy.app) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                HomeNavTile(Copy.engine, onEngine, Modifier.weight(1f), HanaColors.accentBlue)
+                HomeNavTile(Copy.settings, onSettings, Modifier.weight(1f), HanaColors.accentLilac)
+            }
+            HomeNavTile(Copy.quit, onQuit, Modifier.fillMaxWidth(), HanaColors.textDim)
+        }
+    }
+}
+
+@Composable
+private fun RecentSection(
+    hazeState: HazeState,
+    recents: List<RecentGame>,
+    homeVm: HomeViewModel,
+    navigator: cafe.adriel.voyager.navigator.Navigator,
+) {
+    PorcelainCard(hazeState, title = Copy.recent) {
+        if (recents.isEmpty()) {
+            Text(Copy.noRecent, color = HanaColors.textDim, fontSize = 14.sp)
+        } else {
+            recents.forEach { game ->
+                RecentGameCard(
+                    game = game,
+                    now = epochMillis(),
+                    onOpen = {
+                        val loaded = homeVm.openRecent(game.id) ?: return@RecentGameCard
+                        navigator.push(
+                            SessionScreen(
+                                config = loaded.config,
+                                loadedTree = loaded.tree,
+                                recentId = loaded.record.id,
+                                recentTitle = loaded.record.title,
+                            ),
+                        )
+                    },
+                    onRemove = { homeVm.removeRecent(game.id) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChangelogSection(hazeState: dev.chrisbanes.haze.HazeState) {
+    val entries = AppInfo.changelog.take(16)
+    PorcelainCard(hazeState, title = Copy.whatsNew) {
+        if (entries.isEmpty()) {
+            Text(Copy.noChangelog, color = HanaColors.textDim, fontSize = 14.sp)
+        } else {
+            entries.forEach { entry ->
+                ChangelogRow(entry)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChangelogRow(entry: ChangelogEntry) {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            val kind = entry.kind
+            if (kind != null) {
+                val accent = when (kind.lowercase()) {
+                    "feat" -> HanaColors.accentPink
+                    "fix" -> HanaColors.accentBlue
+                    else -> HanaColors.accentLilac
+                }
+                Box(
+                    Modifier
+                        .clip(hanaTokens.capsule)
+                        .background(accent.copy(alpha = 0.18f))
+                        .padding(horizontal = 8.dp, vertical = 2.dp),
+                ) {
+                    Text(kind, color = accent, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                }
+            }
+            Text(entry.date, color = HanaColors.textDim, fontSize = 12.sp)
+        }
+        Text(entry.title, color = HanaColors.text, fontSize = 14.sp)
     }
 }
 
@@ -231,10 +398,10 @@ private fun RecentGameCard(
     Row(
         Modifier
             .fillMaxWidth()
-            .clip(tokens.card)
-            .background(HanaColors.bgCard)
+            .clip(tokens.panel)
+            .background(Color.White.copy(alpha = 0.05f))
             .clickable(onClick = onOpen)
-            .padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 12.dp),
+            .padding(start = 14.dp, end = 8.dp, top = 10.dp, bottom = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
