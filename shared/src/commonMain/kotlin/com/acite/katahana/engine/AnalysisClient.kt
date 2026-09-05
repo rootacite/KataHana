@@ -130,7 +130,6 @@ class AnalysisClient(
             nodeId,
             nonce,
             tree,
-            maxVisits = currentProfile.playVisits,
         )
         val response = sendAndAwaitFinal(
             query,

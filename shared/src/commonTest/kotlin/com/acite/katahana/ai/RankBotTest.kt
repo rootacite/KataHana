@@ -26,6 +26,21 @@ class RankBotTest {
         assertTrue(n9k < n1d, "stronger rank samples more (9k=$n9k, 1d=$n1d)")
         assertTrue(n9k >= 1)
         assertTrue(n1d <= legal)
+        assertEquals(75, RankBot.nMoves(361, 361, kyu = 5))
+        assertEquals(23, RankBot.nMoves(361, 361, kyu = 15))
+    }
+
+    @Test
+    fun occupiedHighPolicyIsNotPlayed() {
+        val size = 9
+        val occupied = Point.fromIndex(40, size)
+        val pos = Position.of(size, black = listOf(occupied), toPlay = StoneColor.White)
+        val policy = DoubleArray(size * size + 1) { 0.002 }
+        policy[40] = 0.9
+        policy[0] = 0.08
+        val decision = RankBot.choose(policy.toList(), pos, kyu = 5, rng = Random(1))
+        val place = assertIs<Move.Place>(decision.move)
+        assertTrue(place.point != Point.fromIndex(40, size))
     }
 
     @Test

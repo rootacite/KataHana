@@ -17,8 +17,9 @@ data class RankDecision(
 
 /**
  * KaTrain Calibrated Rank (`RankStrategy`): policy pick, not weaker visits.
- * Sampling uses equal weights then highest policy among the sample
- * (`generate_weighted_coords` weight=1).
+ * Query is maxVisits=1 + includePolicy. Sampling uses equal weights on every
+ * policy>0 intersection (`generate_weighted_coords` weight=1), then the highest
+ * legal policy among the sample.
  */
 object RankBot {
     fun nMoves(legalCount: Int, boardSquares: Int, kyu: Int): Int {
@@ -30,7 +31,8 @@ object RankBot {
         val modified = (0.3931 + 0.6559 * norm * exp(-expTerm * expTerm) - 0.01093 * kyu) * orig
         val denom = 1.31165 * (modified + 1) - 0.082653
         val raw = boardSquares * norm / denom
-        return round(raw).toInt().coerceIn(1, legalCount)
+        // KaTrain: max(1, round(n_moves)) — do not clamp to legal here.
+        return maxOf(1, round(raw).toInt())
     }
 
     fun choose(
@@ -48,6 +50,7 @@ object RankBot {
             return RankDecision(fallback, 1, usedOverride = true)
         }
         val passPolicy = policy[squares]
+        // KaTrain `policy_ranking`: every intersection + pass, occupied included.
         val ranked = ArrayList<Pair<Double, Point?>>(squares + 1)
         for (i in 0 until squares) {
             ranked += policy[i] to Point.fromIndex(i, size)
@@ -57,30 +60,31 @@ object RankBot {
 
         val top5Pass = ranked.take(5).any { it.second == null }
         val legal = Rules.legalMoves(position).toHashSet()
-        val legalPolicy = ranked.filter { (pol, point) ->
-            point != null && pol > 0.0 && point in legal
+        // KaTrain `generate_weighted_coords`: policy > 0 on the whole grid, not legal-only.
+        val policyPositive = ranked.filter { (pol, point) ->
+            point != null && pol > 0.0
         }
         val top = ranked.first()
         val topPoint = top.second
         val topIsLegal = topPoint == null || topPoint in legal
-        val fillRatio = (squares - legalPolicy.size).toDouble() / squares
+        val fillRatio = (squares - policyPositive.size).toDouble() / squares
         val override = 0.8 * (1.0 - 0.5 * fillRatio)
         val override2 = 0.85 + maxOf(0.0, 0.02 * (kyu - 8))
         val second = ranked.getOrNull(1)?.first ?: 0.0
-        val forceTop = top5Pass || top.first >= override || top.first + second >= override2
+        val forceTop = top5Pass || top.first > override || top.first + second > override2
         if (forceTop && topIsLegal) {
             val move = if (topPoint == null) Move.Pass(toPlay) else Move.Place(toPlay, topPoint)
             return RankDecision(move, nMoves = 1, usedOverride = true)
         }
 
-        if (legalPolicy.isEmpty()) {
+        if (policyPositive.isEmpty()) {
             return RankDecision(Move.Pass(toPlay), 1, usedOverride = true)
         }
 
-        val n = nMoves(legalPolicy.size, squares, kyu)
-        val sample = weightedSample(legalPolicy, n, rng)
-        val best = sample.maxBy { it.first }
-        if (best.first < passPolicy) {
+        val n = nMoves(policyPositive.size, squares, kyu)
+        val sample = weightedSample(policyPositive, n, rng)
+        val bestLegal = sample.filter { it.second in legal }.maxByOrNull { it.first }
+        if (bestLegal == null || bestLegal.first < passPolicy) {
             val move = if (topPoint == null || topPoint !in legal) {
                 Move.Pass(toPlay)
             } else {
@@ -88,7 +92,7 @@ object RankBot {
             }
             return RankDecision(move, n, usedOverride = true)
         }
-        val point = best.second ?: return RankDecision(Move.Pass(toPlay), n, usedOverride = false)
+        val point = bestLegal.second ?: return RankDecision(Move.Pass(toPlay), n, usedOverride = false)
         return RankDecision(Move.Place(toPlay, point), n, usedOverride = false)
     }
 
