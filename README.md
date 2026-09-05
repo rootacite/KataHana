@@ -59,7 +59,7 @@ Open the app and you land on a night-lit shelf: porcelain cards over a soft nigh
   <img src="screenshots/home.jpg" alt="Home — recent games, git-tagged changelog, and a version label read from the latest tag"/>
 </p>
 
-The other card is **What's new**, which scrolls the project's own git history with tag chips on tagged commits. Nothing here is typed by hand: the changelog is generated at build time, and the version in the corner follows the nearest git tag (`v1.4` today; `v0.1-alpha` when the tree has no tags).
+The other card is **What's new**, which scrolls the project's own git history with tag chips on tagged commits. Nothing here is typed by hand: the changelog is generated at build time, and the version in the corner follows the nearest git tag (`v1.4.1` today; `v0.1-alpha` when the tree has no tags).
 
 ---
 
