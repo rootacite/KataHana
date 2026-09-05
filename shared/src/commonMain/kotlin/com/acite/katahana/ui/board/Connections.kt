@@ -47,7 +47,18 @@ fun DrawScope.drawStoneLinks(
             LinkKind.Kosumi -> drawKosumi(from, to, stoneR, swatch.fill, swatch.rim, t)
             LinkKind.Tobi -> {
                 val mid = link.via.firstOrNull()?.let(centerOf)
-                drawTobi(from, to, mid, stoneR, swatch.fill, swatch.hi, t)
+                drawTobi(
+                    from,
+                    to,
+                    mid,
+                    centerOf(link.a),
+                    centerOf(link.b),
+                    link.lean,
+                    stoneR,
+                    swatch.fill,
+                    swatch.hi,
+                    t,
+                )
             }
             LinkKind.Keima -> {
                 val elbow = link.via.firstOrNull()?.let(centerOf)
@@ -97,13 +108,16 @@ private fun DrawScope.drawTobi(
     a: Offset,
     b: Offset,
     mid: Offset?,
+    origin: Offset,
+    dest: Offset,
+    lean: Int,
     stoneR: Float,
     fill: Color,
     hi: Color,
     t: Float,
 ) {
     val (from, to) = trimmed(a, b, stoneR * 0.90f)
-    val peak = tobiPeak(from, to, mid, stoneR)
+    val peak = tobiPeak(origin, dest, mid, lean, stoneR)
     val path = Path().apply {
         moveTo(from.x, from.y)
         quadraticTo(peak.x, peak.y, to.x, to.y)
@@ -164,17 +178,21 @@ private fun DrawScope.drawPartial(
     drawPath(dest, color, style = stroke)
 }
 
-private fun tobiPeak(from: Offset, to: Offset, mid: Offset?, stoneR: Float): Offset {
-    val bulge = mid ?: Offset((from.x + to.x) / 2f, (from.y + to.y) / 2f)
-    var dx = to.x - from.x
-    var dy = to.y - from.y
-    if (dx < 0f || (dx == 0f && dy < 0f)) {
-        dx = -dx
-        dy = -dy
-    }
+private fun tobiPeak(
+    origin: Offset,
+    dest: Offset,
+    mid: Offset?,
+    lean: Int,
+    stoneR: Float,
+): Offset {
+    val bulge = mid ?: Offset((origin.x + dest.x) / 2f, (origin.y + dest.y) / 2f)
+    if (lean == 0) return bulge
+    val dx = dest.x - origin.x
+    val dy = dest.y - origin.y
     val len = hypot(dx, dy).coerceAtLeast(1f)
-    val nx = dy / len
-    val ny = -dx / len
+    val s = lean.toFloat()
+    val nx = dy / len * s
+    val ny = -dx / len * s
     return Offset(bulge.x + nx * stoneR * 0.55f, bulge.y + ny * stoneR * 0.55f)
 }
 

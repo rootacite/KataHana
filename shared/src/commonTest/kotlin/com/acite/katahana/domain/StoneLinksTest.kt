@@ -78,6 +78,64 @@ class StoneLinksTest {
     }
 
     @Test
+    fun isolatedTobiHasNoLean() {
+        val snap = board(black = listOf(Point(0, 4), Point(2, 4)))
+        val link = stoneLinks(snap).single()
+        assertEquals(LinkKind.Tobi, link.kind)
+        assertEquals(0, link.lean)
+    }
+
+    @Test
+    fun jumpSquareTobiLeansOutward() {
+        val snap = board(black = listOf(Point(0, 0), Point(2, 0), Point(0, 2), Point(2, 2)))
+        val tobi = stoneLinks(snap).filter { it.kind == LinkKind.Tobi }
+        assertEquals(4, tobi.size)
+        for (link in tobi) {
+            val mid = link.via.first()
+            val dx = (link.b.x - link.a.x).toFloat()
+            val dy = (link.b.y - link.a.y).toFloat()
+            val nx = dy * link.lean
+            val ny = -dx * link.lean
+            val towardCenter = nx * (1f - mid.x) + ny * (1f - mid.y)
+            assertTrue(link.lean != 0, "edge at $mid should arch")
+            assertTrue(towardCenter < 0f, "edge at $mid should lean away from (1,1), lean=${link.lean}")
+        }
+    }
+
+    @Test
+    fun isolatedKeimaKeepsOneElbow() {
+        val snap = board(black = listOf(Point(2, 2), Point(3, 4)))
+        val link = stoneLinks(snap).single()
+        assertEquals(LinkKind.Keima, link.kind)
+        assertEquals(1, link.via.size)
+    }
+
+    @Test
+    fun keimaBesideABlockPicksTheOuterElbow() {
+        val snap = board(
+            black = listOf(
+                Point(1, 1), Point(2, 1),
+                Point(1, 2), Point(2, 2),
+                Point(3, 4),
+            ),
+        )
+        val keima = stoneLinks(snap).single { it.kind == LinkKind.Keima }
+        assertEquals(setOf(Point(2, 2), Point(3, 4)), setOf(keima.a, keima.b))
+        assertEquals(Point(2, 4), keima.via.first())
+    }
+
+    @Test
+    fun keimaRingPicksOuterElbows() {
+        val snap = board(black = listOf(Point(2, 2), Point(4, 3), Point(3, 5), Point(1, 4)))
+        val keima = stoneLinks(snap).filter { it.kind == LinkKind.Keima }
+        assertEquals(4, keima.size)
+        assertEquals(
+            setOf(Point(4, 2), Point(4, 5), Point(1, 5), Point(1, 2)),
+            keima.map { it.via.first() }.toSet(),
+        )
+    }
+
+    @Test
     fun pinShapeDropsJumpWhenKosumiPathExists() {
         val snap = board(black = listOf(Point(2, 1), Point(1, 2), Point(3, 2)))
         val links = stoneLinks(snap)
