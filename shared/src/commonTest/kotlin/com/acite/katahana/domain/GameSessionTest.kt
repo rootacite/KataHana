@@ -79,5 +79,54 @@ class GameSessionTest {
         assertTrue(snap.reviewing)
         assertFalse(snap.aiToPlay)
         assertTrue(snap.canRedo)
+        assertTrue(snap.humanControls)
+    }
+
+    @Test
+    fun bothAiSeatsMoveAtEveryLiveLeaf() {
+        val session = GameSession(
+            GameConfig(
+                boardSize = 9,
+                black = PlayerSeat(SeatKind.Rank, 5),
+                white = PlayerSeat(SeatKind.HumanLike, 3),
+            ),
+        )
+        assertTrue(session.aiShouldMove())
+        assertFalse(session.snapshot().humanControls)
+        session.play(Point(3, 3))
+        assertTrue(session.aiShouldMove())
+        session.undo()
+        assertTrue(session.reviewing)
+        assertFalse(session.aiShouldMove())
+        assertTrue(session.snapshot().humanControls)
+    }
+
+    @Test
+    fun takingOverCurrentSeatStopsAi() {
+        val session = GameSession(
+            GameConfig(
+                boardSize = 9,
+                black = PlayerSeat(SeatKind.Full),
+                white = PlayerSeat(SeatKind.Rank, 8),
+            ),
+        )
+        assertTrue(session.aiShouldMove())
+        session.setSeat(StoneColor.Black, PlayerSeat())
+        assertFalse(session.aiShouldMove())
+        assertTrue(session.snapshot().humanControls)
+        assertEquals(SeatKind.Rank, session.config.white.kind)
+    }
+
+    @Test
+    fun humanControlsAtGameOverEvenIfNextSeatIsAi() {
+        val session = GameSession(
+            GameConfig(boardSize = 9, mode = PlayMode.HumanVsAi, humanPlaysBlack = true),
+        )
+        session.pass()
+        session.pass()
+        val snap = session.snapshot()
+        assertTrue(snap.ended)
+        assertFalse(snap.aiToPlay)
+        assertTrue(snap.humanControls)
     }
 }

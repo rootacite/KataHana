@@ -4,8 +4,10 @@ import com.acite.katahana.domain.AiStyle
 import com.acite.katahana.domain.GameConfig
 import com.acite.katahana.domain.GameTree
 import com.acite.katahana.domain.PlayMode
+import com.acite.katahana.domain.PlayerSeat
 import com.acite.katahana.domain.Point
 import com.acite.katahana.domain.Move
+import com.acite.katahana.domain.SeatKind
 import com.acite.katahana.sgf.writeSgf
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -77,7 +79,7 @@ class RecentGamesIndexTest {
             rankKyu = 5,
             aiStyle = AiStyle.Rank,
         )
-        assertEquals("19×19 · vs 5k", defaultRecentTitle(hvai))
+        assertEquals("19×19 · Human vs Rank AI 5k", defaultRecentTitle(hvai))
         val record = sample("x", "X").copy(
             boardSize = 9,
             mode = "hvai",
@@ -96,10 +98,37 @@ class RecentGamesIndexTest {
             rankKyu = 5,
             aiStyle = AiStyle.Human,
         )
-        assertEquals("19×19 · vs 5k", defaultRecentTitle(human))
+        assertEquals("19×19 · Human vs Human-like 5k", defaultRecentTitle(human))
         assertEquals("human", human.toRecentAiStyle())
-        assertEquals(AiStyle.Human, sample("h", "H").copy(aiStyle = "human").toConfig().aiStyle)
-        assertEquals(AiStyle.Rank, sample("r", "R").copy(aiStyle = "rank").toConfig().aiStyle)
+        assertEquals(
+            AiStyle.Human,
+            sample("h", "H").copy(mode = "hvai", aiStyle = "human").toConfig().aiStyle,
+        )
+        assertEquals(
+            AiStyle.Rank,
+            sample("r", "R").copy(mode = "hvai", aiStyle = "rank").toConfig().aiStyle,
+        )
+        val fromOldHuman = sample("h", "H").copy(mode = "hvai", aiStyle = "human").toConfig()
+        assertEquals(SeatKind.Human, fromOldHuman.black.kind)
+        assertEquals(SeatKind.HumanLike, fromOldHuman.white.kind)
+        val dual = GameConfig(
+            boardSize = 19,
+            black = PlayerSeat(SeatKind.Full),
+            white = PlayerSeat(SeatKind.HumanLike, 5),
+        )
+        assertEquals("19×19 · KataGo 9D+ vs Human-like 5k", defaultRecentTitle(dual))
+        assertEquals("KataGo", seatName(dual.black))
+        assertEquals("9D+", seatRankChip(dual.black))
+        assertEquals("5k", seatRankChip(dual.white))
+        assertEquals(null, seatRankChip(PlayerSeat()))
+        val stored = sample("d", "D").copy(
+            blackKind = "full",
+            whiteKind = "humanlike",
+            blackRankKyu = 5,
+            whiteRankKyu = 5,
+        ).toConfig()
+        assertEquals(SeatKind.Full, stored.black.kind)
+        assertEquals(SeatKind.HumanLike, stored.white.kind)
     }
 
     @Test

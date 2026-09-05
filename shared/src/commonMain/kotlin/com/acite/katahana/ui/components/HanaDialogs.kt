@@ -85,7 +85,7 @@ fun SaveNameDialog(
 }
 
 @Composable
-private fun HanaDialogCard(
+internal fun HanaDialogCard(
     onDismiss: () -> Unit,
     content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit,
 ) {

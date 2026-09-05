@@ -1,6 +1,7 @@
 package com.acite.katahana.ui.session
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,21 +26,22 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.acite.katahana.domain.AiStyle
 import com.acite.katahana.domain.EvalGraphMode
 import com.acite.katahana.domain.EvalSample
-import com.acite.katahana.domain.PlayMode
 import com.acite.katahana.domain.QualityStats
+import com.acite.katahana.domain.SeatKind
 import com.acite.katahana.domain.SessionSnapshot
 import com.acite.katahana.domain.StoneColor
 import com.acite.katahana.domain.TreeLayout
-import com.acite.katahana.domain.rankLabel
+import com.acite.katahana.recents.seatName
+import com.acite.katahana.recents.seatRankChip
 import com.acite.katahana.engine.Candidate
 import com.acite.katahana.engine.formatPv
 import com.acite.katahana.engine.formatScoreLoss
 import com.acite.katahana.ui.Copy
 import com.acite.katahana.ui.components.CapsuleButton
 import com.acite.katahana.ui.components.QuietTextButton
+import com.acite.katahana.ui.components.RankCard
 import com.acite.katahana.ui.theme.HanaColors
 import com.acite.katahana.ui.theme.hanaAppearance
 import com.acite.katahana.ui.theme.hanaTokens
@@ -86,6 +88,7 @@ fun SidePanel(
     onAnalyzeGame: () -> Unit = {},
     onBack: (() -> Unit)? = null,
     onSettings: (() -> Unit)? = null,
+    onEditSeat: (StoneColor) -> Unit = {},
 ) {
     Column(
         modifier = modifier
@@ -99,8 +102,8 @@ fun SidePanel(
                 if (onSettings != null) QuietTextButton(Copy.settings, onClick = onSettings)
             }
         }
-        StatusCard(snapshot)
-        if (snapshot.mode == PlayMode.HumanVsAi) {
+        StatusCard(snapshot, onEditSeat = onEditSeat)
+        if (snapshot.aiToPlay) {
             val aiLine = when {
                 snapshot.ended -> null
                 snapshot.reviewing -> null
@@ -116,7 +119,7 @@ fun SidePanel(
         if (snapshot.ended) {
             Text(Copy.twoPasses, color = HanaColors.accentPink, fontSize = 14.sp)
         }
-        val humanTurn = !aiThinking && !snapshot.ended && !snapshot.aiToPlay
+        val humanTurn = snapshot.humanControls && !snapshot.ended
         PlayActionsBar(
             snapshot = snapshot,
             hasSelection = hasSelection,
@@ -311,7 +314,10 @@ private fun CandidatesCard(
 }
 
 @Composable
-fun StatusCard(snapshot: SessionSnapshot) {
+fun StatusCard(
+    snapshot: SessionSnapshot,
+    onEditSeat: (StoneColor) -> Unit = {},
+) {
     val tokens = hanaTokens
     Column(
         Modifier
@@ -321,35 +327,38 @@ fun StatusCard(snapshot: SessionSnapshot) {
             .padding(14.dp),
     ) {
         val appearance = hanaAppearance
+        SeatRow(
+            label = Copy.black,
+            name = seatName(snapshot.black),
+            rank = seatRankChip(snapshot.black),
+            godlike = snapshot.black.kind == SeatKind.Full,
+            stone = appearance.first.fill,
+            toPlay = snapshot.toPlay == StoneColor.Black,
+            onClick = { onEditSeat(StoneColor.Black) },
+        )
+        Spacer(Modifier.height(8.dp))
+        SeatRow(
+            label = Copy.white,
+            name = seatName(snapshot.white),
+            rank = seatRankChip(snapshot.white),
+            godlike = snapshot.white.kind == SeatKind.Full,
+            stone = appearance.second.fill,
+            toPlay = snapshot.toPlay == StoneColor.White,
+            onClick = { onEditSeat(StoneColor.White) },
+        )
+        Spacer(Modifier.height(10.dp))
         val toPlay = if (snapshot.toPlay == StoneColor.Black) Copy.black else Copy.white
-        val toPlayColor = appearance.swatch(snapshot.toPlay).fill
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            ColorDot(toPlayColor)
-            Spacer(Modifier.size(8.dp))
-            Text(
-                "${Copy.toPlay}: $toPlay",
-                color = HanaColors.text,
-                fontSize = 16.sp,
-            )
-        }
+        Text(
+            "${Copy.toPlay}: $toPlay",
+            color = HanaColors.text,
+            fontSize = 16.sp,
+        )
         Spacer(Modifier.height(6.dp))
         Text(
             "${Copy.move} ${snapshot.moveNumber}  ·  ${snapshot.size}×${snapshot.size}  ·  komi ${snapshot.komi}",
             color = HanaColors.textDim,
             fontSize = 13.sp,
         )
-        if (snapshot.mode == PlayMode.HumanVsAi) {
-            val style = when (snapshot.aiStyle) {
-                AiStyle.Full -> Copy.fullStrength
-                AiStyle.Rank -> "Rank ${rankLabel(snapshot.rankKyu)}"
-                AiStyle.Human -> "${Copy.humanLike} ${rankLabel(snapshot.rankKyu)}"
-            }
-            Text(
-                style,
-                color = HanaColors.accentLilac,
-                fontSize = 13.sp,
-            )
-        }
         if (snapshot.reviewing) {
             Spacer(Modifier.height(6.dp))
             Text(Copy.review, color = HanaColors.accentPink, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
@@ -362,6 +371,45 @@ fun StatusCard(snapshot: SessionSnapshot) {
             ColorDot(appearance.second.fill, 8.dp)
             Text(" ${snapshot.capturedByWhite}", color = HanaColors.textDim, fontSize = 13.sp)
         }
+    }
+}
+
+@Composable
+private fun SeatRow(
+    label: String,
+    name: String,
+    rank: String?,
+    godlike: Boolean,
+    stone: Color,
+    toPlay: Boolean,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(hanaTokens.capsule)
+            .clickable(onClick = onClick)
+            .padding(vertical = 6.dp, horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        ColorDot(stone, if (toPlay) 12.dp else 10.dp)
+        Spacer(Modifier.size(10.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                label,
+                color = if (toPlay) HanaColors.text else HanaColors.textDim,
+                fontSize = 13.sp,
+                fontWeight = if (toPlay) FontWeight.SemiBold else FontWeight.Normal,
+            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(name, color = HanaColors.accentLilac, fontSize = 14.sp)
+                if (rank != null) RankCard(rank, emphasized = godlike)
+            }
+        }
+        Text("›", color = HanaColors.textDim, fontSize = 18.sp)
     }
 }
 

@@ -44,7 +44,7 @@ fun writeSgf(
     sb.append("PB[").append(escape(blackName)).append(']')
     sb.append("PW[").append(escape(whiteName)).append(']')
     if (config.mode == PlayMode.HumanVsAi) {
-        sb.append("GN[").append(escape("HvAI ${config.aiStyle} ${config.rankKyu}")).append(']')
+        sb.append("GN[").append(escape("${config.black.kind} vs ${config.white.kind}")).append(']')
     }
     writeBranches(tree.root, sb)
     sb.append(')')

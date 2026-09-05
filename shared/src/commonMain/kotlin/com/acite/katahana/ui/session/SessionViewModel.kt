@@ -8,7 +8,6 @@ import com.acite.katahana.ai.QualityMark
 import com.acite.katahana.ai.RankBot
 import com.acite.katahana.ai.bandForLoss
 import com.acite.katahana.ai.recentQualities
-import com.acite.katahana.domain.AiStyle
 import com.acite.katahana.domain.EvalGraphMode
 import com.acite.katahana.domain.EvalSample
 import com.acite.katahana.domain.EvalView
@@ -17,12 +16,14 @@ import com.acite.katahana.domain.GameSession
 import com.acite.katahana.domain.GameTree
 import com.acite.katahana.domain.Node
 import com.acite.katahana.domain.Move
-import com.acite.katahana.domain.PlayMode
 import com.acite.katahana.domain.PlayResult
+import com.acite.katahana.domain.PlayerSeat
 import com.acite.katahana.domain.Point
 import com.acite.katahana.domain.QualityStats
+import com.acite.katahana.domain.SeatKind
 import com.acite.katahana.domain.SessionSnapshot
 import com.acite.katahana.domain.StoneColor
+import com.acite.katahana.domain.toStorageId
 import com.acite.katahana.domain.TreeLayout
 import com.acite.katahana.domain.layout
 import com.acite.katahana.domain.nodeById
@@ -39,6 +40,7 @@ import com.acite.katahana.engine.pointsLost
 import com.acite.katahana.engine.DEAD_MIN_VISITS
 import com.acite.katahana.engine.classifyDead
 import com.acite.katahana.engine.heldOwnership
+import com.acite.katahana.engine.heldScalar
 import com.acite.katahana.engine.selectCandidates
 import com.acite.katahana.engine.toBlackView
 import com.acite.katahana.epochMillis
@@ -46,6 +48,7 @@ import com.acite.katahana.recents.PersistedEval
 import com.acite.katahana.recents.RecentGame
 import com.acite.katahana.recents.RecentGamesRepository
 import com.acite.katahana.recents.defaultRecentTitle
+import com.acite.katahana.recents.seatSgfName
 import com.acite.katahana.recents.toRecentAiStyle
 import com.acite.katahana.recents.toRecentMode
 import com.acite.katahana.settings.OwnershipStyle
@@ -126,7 +129,7 @@ private data class StoredEval(
 
 @AssistedInject
 class SessionViewModel(
-    @Assisted val config: GameConfig,
+    @Assisted config: GameConfig,
     @Assisted val loadedTree: GameTree?,
     @Assisted private val recentId: String?,
     @Assisted private val recentTitle: String?,
@@ -149,6 +152,9 @@ class SessionViewModel(
     private var boundCreatedAt: Long? = null
     private var savedSgf: String? = null
     private var savedPath: List<Int>? = null
+    private var savedBlack = session.config.black
+    private var savedWhite = session.config.white
+    private var paused = false
 
     val confirmMove: StateFlow<Boolean> = settings.confirmMove.stateIn(
         viewModelScope,
@@ -301,20 +307,38 @@ class SessionViewModel(
         _state.update { it.copy(evalGraphMode = mode) }
     }
 
+    fun setPaused(value: Boolean) {
+        if (paused == value) return
+        paused = value
+        if (value) {
+            bumpNav()
+            _state.update { it.copy(aiThinking = false) }
+        } else {
+            afterPositionChange()
+        }
+    }
+
+    fun setSeat(color: StoneColor, seat: PlayerSeat) {
+        if (session.config.seat(color) == seat) return
+        bumpNav()
+        session.setSeat(color, seat)
+        publish()
+    }
+
     fun onHover(point: Point?) {
-        val next = if (point != null && (session.tree.ended || isAiToPlay())) null else point
+        val next = if (point != null && (paused || session.tree.ended || isAiToPlay())) null else point
         if (_state.value.hover == next) return
         _state.update { it.copy(hover = next) }
     }
 
     fun onAim(point: Point?) {
-        if (session.tree.ended || isAiToPlay()) return
+        if (paused || !canPlace()) return
         if (point != null && session.position.stoneAt(point) != null) return
         _state.update { it.copy(selected = point, hover = null) }
     }
 
     fun onActivate(point: Point, isTouch: Boolean) {
-        if (session.tree.ended || isAiToPlay()) return
+        if (paused || !canPlace()) return
         if (session.position.stoneAt(point) != null) return
         val twoStep = isTouch || confirmMove.value
         if (twoStep) {
@@ -329,43 +353,46 @@ class SessionViewModel(
     }
 
     fun confirmSelected() {
-        if (isAiToPlay()) return
+        if (paused || !canPlace()) return
         val point = _state.value.selected ?: return
         commit(point)
     }
 
     fun pass() {
-        if (isAiToPlay()) return
+        if (!humanControls() || session.tree.ended) return
         cancelReviewQueue()
         snapshotLiveToCurrentNode()
         if (session.pass() is PlayResult.Ok) publish()
     }
 
     fun undo() {
+        if (!humanControls()) return
         bumpNav()
         if (session.undo()) publish()
     }
 
     fun redo() {
+        if (!humanControls()) return
         bumpNav()
         if (session.redo()) publish()
     }
 
     fun cycleVariation(delta: Int) {
+        if (!humanControls()) return
         bumpNav()
         if (session.cycleVariation(delta)) publish()
     }
 
     fun goToNode(id: String) {
         if (id == session.tree.current.id) return
+        if (!humanControls()) return
         bumpNav()
         if (session.goTo(id)) publish()
     }
 
     fun sgfText(): String {
-        val black = if (config.humanPlaysBlack) "Human" else aiPlayerName()
-        val white = if (config.humanPlaysBlack) aiPlayerName() else "Human"
-        return writeSgf(session.tree, config, black, white)
+        val cfg = session.config
+        return writeSgf(session.tree, cfg, seatSgfName(cfg.black), seatSgfName(cfg.white))
     }
 
     fun sgfFileName(): String = "katahana-${session.tree.size}x${session.tree.size}.sgf"
@@ -378,7 +405,7 @@ class SessionViewModel(
     }
 
     suspend fun saveAs(name: String): SaveOutcome {
-        val title = name.trim().ifBlank { defaultRecentTitle(config) }
+        val title = name.trim().ifBlank { defaultRecentTitle(session.config) }
         return writeRecent(newRecentId(), title, newCopy = true)
     }
 
@@ -391,12 +418,16 @@ class SessionViewModel(
             savedAt = now,
             createdAt = created,
             moveNumber = session.tree.current.moveNumber,
-            boardSize = config.boardSize,
-            komi = config.komi,
-            mode = config.toRecentMode(),
-            rankKyu = config.rankKyu,
-            humanPlaysBlack = config.humanPlaysBlack,
-            aiStyle = config.toRecentAiStyle(),
+            boardSize = session.config.boardSize,
+            komi = session.config.komi,
+            mode = session.config.toRecentMode(),
+            rankKyu = session.config.rankKyu,
+            humanPlaysBlack = session.config.humanPlaysBlack,
+            aiStyle = session.config.toRecentAiStyle(),
+            blackKind = session.config.black.kind.toStorageId(),
+            whiteKind = session.config.white.kind.toStorageId(),
+            blackRankKyu = session.config.black.rankKyu,
+            whiteRankKyu = session.config.white.rankKyu,
             sgf = sgfText(),
             currentPath = session.tree.childPath(),
             evals = dumpEvals(),
@@ -408,6 +439,8 @@ class SessionViewModel(
             boundCreatedAt = created
             savedSgf = game.sgf
             savedPath = game.currentPath
+            savedBlack = session.config.black
+            savedWhite = session.config.white
             refreshSaveFlags()
             SaveOutcome.Saved
         }.getOrElse { SaveOutcome.Failed }
@@ -417,21 +450,19 @@ class SessionViewModel(
 
     private fun hasContent(): Boolean = session.tree.root.children.isNotEmpty()
 
+    private fun seatsDirty(): Boolean =
+        session.config.black != savedBlack || session.config.white != savedWhite
+
     private fun computeDirty(): Boolean {
-        if (boundId == null) return hasContent()
-        return sgfText() != savedSgf || session.tree.childPath() != savedPath
+        val seats = seatsDirty()
+        if (boundId == null) return hasContent() || seats
+        return sgfText() != savedSgf || session.tree.childPath() != savedPath || seats
     }
 
     private fun refreshSaveFlags() {
         _state.update {
-            it.copy(dirty = computeDirty(), canSave = boundId != null || hasContent())
+            it.copy(dirty = computeDirty(), canSave = boundId != null || hasContent() || seatsDirty())
         }
-    }
-
-    private fun aiPlayerName(): String = when {
-        config.mode != PlayMode.HumanVsAi -> "White"
-        config.aiStyle == AiStyle.Full -> "KataHana Full"
-        else -> "KataHana ${com.acite.katahana.domain.rankLabel(config.rankKyu)}"
     }
 
     private fun commit(point: Point) {
@@ -450,8 +481,8 @@ class SessionViewModel(
                 candidates = eval?.let { stored ->
                     selectCandidates(stored.moveInfos, session.tree.size, stored.toPlay)
                 } ?: emptyList(),
-                blackWinrate = eval?.blackWinrate,
-                blackScoreLead = eval?.blackScoreLead,
+                blackWinrate = heldScalar(eval?.takeIf { stored -> stored.hasView }?.blackWinrate, it.blackWinrate),
+                blackScoreLead = heldScalar(eval?.takeIf { stored -> stored.hasView }?.blackScoreLead, it.blackScoreLead),
                 visits = eval?.visits ?: 0,
                 ownership = heldOwnership(it.ownership, eval?.ownership ?: emptyList(), session.tree.size),
                 deadPoints = resolveDead(
@@ -464,7 +495,7 @@ class SessionViewModel(
                 aiError = null,
                 tree = session.tree.layout(),
                 dirty = computeDirty(),
-                canSave = boundId != null || hasContent(),
+                canSave = boundId != null || hasContent() || seatsDirty(),
             ).withAnalysis()
         }
         afterPositionChange()
@@ -493,20 +524,22 @@ class SessionViewModel(
             try {
                 val toPlay = session.position.toPlay
                 val nodeId = session.tree.current.id
-                val move = when (config.aiStyle) {
-                    AiStyle.Human -> {
-                        val response = analysis.queryHuman(sessionId, session.tree, config.rankKyu)
+                val seat = session.config.seat(toPlay)
+                val move = when (seat.kind) {
+                    SeatKind.Human -> return@launch
+                    SeatKind.HumanLike -> {
+                        val response = analysis.queryHuman(sessionId, session.tree, seat.rankKyu)
                         storeEval(nodeId, response, toPlay)
                         _state.update { it.withAnalysis() }
                         HumanBot.choose(response.humanPolicy, session.position, Random.Default)
                     }
-                    AiStyle.Rank -> {
+                    SeatKind.Rank -> {
                         val response = analysis.queryRank(sessionId, session.tree)
                         storeEval(nodeId, response, toPlay)
                         _state.update { it.withAnalysis() }
-                        RankBot.choose(response.policy, session.position, config.rankKyu, Random.Default).move
+                        RankBot.choose(response.policy, session.position, seat.rankKyu, Random.Default).move
                     }
-                    AiStyle.Full -> {
+                    SeatKind.Full -> {
                         val response = analysis.queryGenmove(sessionId, session.tree)
                         storeEval(nodeId, response, toPlay)
                         _state.update { it.withAnalysis() }
@@ -533,7 +566,11 @@ class SessionViewModel(
         }
     }
 
-    private fun isAiToPlay(): Boolean = session.aiShouldMove()
+    private fun isAiToPlay(): Boolean = !paused && session.aiShouldMove()
+
+    private fun humanControls(): Boolean = session.snapshot().humanControls
+
+    private fun canPlace(): Boolean = !session.tree.ended && humanControls()
 
     private fun requestLive() {
         if (!analysis.status.value.online) return

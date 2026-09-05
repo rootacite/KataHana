@@ -17,7 +17,7 @@
 
 KataHana is a Go board that stays on your device. The rules, the game tree, the stones, the records — all of it is local, with no server to join and no account to keep. KataGo is a welcome guest rather than a requirement: the client speaks the engine's Analysis JSON over a plain WebSocket, so you can pair it with whichever KataGo build you like — or with none at all. When the engine is away, Human vs Human plays exactly the same game.
 
-When you do invite the AI in, you decide who sits across from you. **Human** (the default) samples KataGo's human-SL net at 15 kyu to 3 dan, so local fights can miss the way a person of that rank would. **Rank** is KaTrain's older policy lottery — sharp in tactics, looser in direction. **Full** plays the engine's strongest move.
+When you do invite the AI in, you decide who sits across from you — and you can change your mind mid-game. Tap a color in the side panel and set it to **Human**, **Rank AI**, **Human-like**, or **KataGo 9D+**. Both sides are independent, so AI vs AI is allowed. **Human-like** (the default for a new AI seat) samples KataGo's human-SL net at 15 kyu to 3 dan, so local fights can miss the way a person of that rank would. **Rank** is KaTrain's older policy lottery — sharp in tactics, looser in direction. **KataGo 9D+** plays the engine's strongest move.
 
 And it looks like the game finally got permission to stay up late. No wood grain, no museum beige. The whole app is dressed for the night — deep purples, sakura pink — and the default stones, clear-sky blue against cherry blossom, still hold up against the dark.
 
@@ -59,7 +59,7 @@ Open the app and you land on a night-lit shelf: porcelain cards over a soft nigh
   <img src="screenshots/home.jpg" alt="Home — recent games, git-tagged changelog, and a version label read from the latest tag"/>
 </p>
 
-The other card is **What's new**, which scrolls the project's own git history with tag chips on tagged commits. Nothing here is typed by hand: the changelog is generated at build time, and the version in the corner follows the nearest git tag (`v1.3.1` today; `v0.1-alpha` when the tree has no tags).
+The other card is **What's new**, which scrolls the project's own git history with tag chips on tagged commits. Nothing here is typed by hand: the changelog is generated at build time, and the version in the corner follows the nearest git tag (`v1.4` today; `v0.1-alpha` when the tree has no tags).
 
 ---
 
@@ -89,7 +89,7 @@ A new game starts with the questions you would ask yourself anyway: how big the 
 | **Boards** | 9×9, 13×13, 19×19 |
 | **Rules** | Chinese, positional superko, GTP coordinates (skip I) |
 | **Human vs Human** | Same device, no network |
-| **Human vs AI** | **Human** — sample KataGo `humanPolicy` at `preaz_{rank}` (`maxVisits=1`), 15k to 3d, 5k by default. **Rank** — KaTrain-calibrated policy lottery. **Full** — KataGo's top move at your play visits. |
+| **Seats** | Each color is **Human**, **Rank AI**, **Human-like**, or **KataGo 9D+**. Change them from the side panel during a game; opening the drawer pauses play. Rank and Human-like go from 15k to 3d. **Human-like** samples KataGo `humanPolicy` at `preaz_{rank}` (`maxVisits=1`). **Rank** is KaTrain's policy lottery. **KataGo 9D+** is the engine's top move at your play visits. |
 | **Review** | Undo, redo, or tap the tree. Off the latest move you are reviewing; on a non-leaf node the next stone is yours. |
 | **Eval** | Live Score / Winrate graph and a Good–Blunder table, bound to the saved game. |
 | **Analysis** | Live top moves with PV, score loss, and visits. **Analyze game** queues the preferred line. |

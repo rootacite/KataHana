@@ -49,6 +49,13 @@ class PerspectiveTest {
     }
 
     @Test
+    fun heldScalarKeepsPreviousWhenIncomingMissing() {
+        assertEquals(0.62, heldScalar(null, 0.62))
+        assertEquals(0.41, heldScalar(0.41, 0.62))
+        assertEquals(null, heldScalar(null, null))
+    }
+
+    @Test
     fun heldOwnershipKeepsPreviousWhenIncomingEmpty() {
         val previous = List(9) { 0.4 }
         assertEquals(previous, heldOwnership(previous, emptyList(), 3))

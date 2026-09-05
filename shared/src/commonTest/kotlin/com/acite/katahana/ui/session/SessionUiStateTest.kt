@@ -1,6 +1,5 @@
 package com.acite.katahana.ui.session
 
-import com.acite.katahana.domain.PlayMode
 import com.acite.katahana.domain.Point
 import com.acite.katahana.domain.Position
 import com.acite.katahana.domain.SessionSnapshot
@@ -62,9 +61,6 @@ class SessionUiStateTest {
             ended = ended,
             moveNumber = 1,
             komi = 6.5f,
-            mode = PlayMode.HumanVsAi,
-            rankKyu = 5,
-            humanPlaysBlack = true,
             aiToPlay = aiToPlay,
         )
     }

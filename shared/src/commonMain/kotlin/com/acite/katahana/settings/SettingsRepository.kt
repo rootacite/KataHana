@@ -10,7 +10,10 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.acite.katahana.domain.GameConfig
 import com.acite.katahana.domain.PlayMode
+import com.acite.katahana.domain.PlayerSeat
 import com.acite.katahana.domain.parseAiStyle
+import com.acite.katahana.domain.parseSeatKind
+import com.acite.katahana.domain.seatsFromLegacy
 import com.acite.katahana.domain.toStorageId
 import com.acite.katahana.engine.EngineProfile
 import dev.zacsweers.metro.AppScope
@@ -79,14 +82,25 @@ class SettingsRepository {
     }
     val lastGame: Flow<GameConfig> = dataStore.data.map { prefs ->
         val size = prefs[Keys.LAST_SIZE] ?: 19
-        GameConfig(
-            boardSize = if (size == 9 || size == 13 || size == 19) size else 19,
-            komi = prefs[Keys.LAST_KOMI] ?: 7.5f,
-            mode = if (prefs[Keys.LAST_MODE] == "hvai") PlayMode.HumanVsAi else PlayMode.HumanVsHuman,
-            rankKyu = (prefs[Keys.LAST_RANK] ?: 5).coerceIn(-2, 15),
-            humanPlaysBlack = prefs[Keys.LAST_HUMAN_BLACK] ?: true,
-            aiStyle = parseAiStyle(prefs[Keys.LAST_AI]),
-        )
+        val boardSize = if (size == 9 || size == 13 || size == 19) size else 19
+        val komi = prefs[Keys.LAST_KOMI] ?: 7.5f
+        val (black, white) = if (prefs[Keys.LAST_BLACK_KIND] != null || prefs[Keys.LAST_WHITE_KIND] != null) {
+            PlayerSeat(
+                kind = parseSeatKind(prefs[Keys.LAST_BLACK_KIND]),
+                rankKyu = (prefs[Keys.LAST_BLACK_RANK] ?: 5).coerceIn(-2, 15),
+            ) to PlayerSeat(
+                kind = parseSeatKind(prefs[Keys.LAST_WHITE_KIND]),
+                rankKyu = (prefs[Keys.LAST_WHITE_RANK] ?: 5).coerceIn(-2, 15),
+            )
+        } else {
+            seatsFromLegacy(
+                mode = if (prefs[Keys.LAST_MODE] == "hvai") PlayMode.HumanVsAi else PlayMode.HumanVsHuman,
+                humanPlaysBlack = prefs[Keys.LAST_HUMAN_BLACK] ?: true,
+                aiStyle = parseAiStyle(prefs[Keys.LAST_AI]),
+                rankKyu = (prefs[Keys.LAST_RANK] ?: 5).coerceIn(-2, 15),
+            )
+        }
+        GameConfig(boardSize = boardSize, komi = komi, black = black, white = white)
     }
 
     suspend fun setConfirmMove(value: Boolean) = edit { it[Keys.CONFIRM_MOVE] = value }
@@ -111,6 +125,10 @@ class SettingsRepository {
         it[Keys.LAST_RANK] = value.rankKyu
         it[Keys.LAST_HUMAN_BLACK] = value.humanPlaysBlack
         it[Keys.LAST_AI] = value.aiStyle.toStorageId()
+        it[Keys.LAST_BLACK_KIND] = value.black.kind.toStorageId()
+        it[Keys.LAST_WHITE_KIND] = value.white.kind.toStorageId()
+        it[Keys.LAST_BLACK_RANK] = value.black.rankKyu
+        it[Keys.LAST_WHITE_RANK] = value.white.rankKyu
     }
 
     suspend fun setQuality(value: QualityThresholds) = edit {
@@ -152,5 +170,9 @@ class SettingsRepository {
         val LAST_RANK = intPreferencesKey("last_rank")
         val LAST_HUMAN_BLACK = booleanPreferencesKey("last_human_black")
         val LAST_AI = stringPreferencesKey("last_ai_style")
+        val LAST_BLACK_KIND = stringPreferencesKey("last_black_kind")
+        val LAST_WHITE_KIND = stringPreferencesKey("last_white_kind")
+        val LAST_BLACK_RANK = intPreferencesKey("last_black_rank")
+        val LAST_WHITE_RANK = intPreferencesKey("last_white_rank")
     }
 }

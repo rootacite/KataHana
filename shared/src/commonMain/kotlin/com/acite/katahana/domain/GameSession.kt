@@ -1,6 +1,9 @@
 package com.acite.katahana.domain
 
-class GameSession(val config: GameConfig, tree: GameTree? = null) {
+class GameSession(config: GameConfig, tree: GameTree? = null) {
+    var config: GameConfig = config
+        private set
+
     val tree: GameTree = tree ?: GameTree(size = config.boardSize, komi = config.komi)
 
     val position: Position get() = tree.current.position
@@ -22,16 +25,22 @@ class GameSession(val config: GameConfig, tree: GameTree? = null) {
 
     val reviewing: Boolean get() = tree.reviewing
 
+    fun setSeat(color: StoneColor, seat: PlayerSeat) {
+        config = if (color == StoneColor.Black) {
+            config.copy(black = seat)
+        } else {
+            config.copy(white = seat)
+        }
+    }
+
     /**
-     * AI moves only at a leaf, on its color, in HvAI, while the game is live.
+     * AI moves only at a leaf, on an AI seat's color, while the game is live.
      * Undo / jump into the interior is review: the human owns the next stone.
      */
     fun aiShouldMove(): Boolean {
-        if (config.mode != PlayMode.HumanVsAi) return false
         if (tree.ended) return false
         if (tree.reviewing) return false
-        val aiIsBlack = !config.humanPlaysBlack
-        return (position.toPlay == StoneColor.Black) == aiIsBlack
+        return config.seat(position.toPlay).isAi
     }
 
     fun snapshot(): SessionSnapshot {
@@ -49,10 +58,8 @@ class GameSession(val config: GameConfig, tree: GameTree? = null) {
             ended = tree.ended,
             moveNumber = tree.current.moveNumber,
             komi = tree.komi,
-            mode = config.mode,
-            rankKyu = config.rankKyu,
-            humanPlaysBlack = config.humanPlaysBlack,
-            aiStyle = config.aiStyle,
+            black = config.black,
+            white = config.white,
             variationIndex = tree.variationIndex(),
             variationCount = tree.variationCount(),
             aiToPlay = aiShouldMove(),
@@ -73,15 +80,39 @@ data class SessionSnapshot(
     val ended: Boolean,
     val moveNumber: Int,
     val komi: Float,
-    val mode: PlayMode,
-    val rankKyu: Int,
-    val humanPlaysBlack: Boolean,
-    val aiStyle: AiStyle = AiStyle.Human,
+    val black: PlayerSeat = PlayerSeat(),
+    val white: PlayerSeat = PlayerSeat(),
     val variationIndex: Int = 0,
     val variationCount: Int = 1,
     val aiToPlay: Boolean = false,
 ) {
     val reviewing: Boolean get() = canRedo
+
+    val mode: PlayMode
+        get() = if (black.isAi || white.isAi) PlayMode.HumanVsAi else PlayMode.HumanVsHuman
+
+    val rankKyu: Int
+        get() = when {
+            white.isAi -> white.rankKyu
+            black.isAi -> black.rankKyu
+            else -> 5
+        }
+
+    val humanPlaysBlack: Boolean get() = !black.isAi
+
+    val aiStyle: AiStyle
+        get() = when {
+            white.isAi -> white.kind.toAiStyle()
+            black.isAi -> black.kind.toAiStyle()
+            else -> AiStyle.Human
+        }
+
+    /** Not an AI leaf that is about to move. Review and game-over still belong to the human. */
+    val humanControls: Boolean
+        get() = ended || reviewing || !seat(toPlay).isAi
+
+    fun seat(color: StoneColor): PlayerSeat =
+        if (color == StoneColor.Black) black else white
 
     fun stoneAt(x: Int, y: Int): StoneColor? =
         StoneColor.fromCell(cells[y * size + x])
@@ -101,10 +132,8 @@ data class SessionSnapshot(
             ended == other.ended &&
             moveNumber == other.moveNumber &&
             komi == other.komi &&
-            mode == other.mode &&
-            rankKyu == other.rankKyu &&
-            humanPlaysBlack == other.humanPlaysBlack &&
-            aiStyle == other.aiStyle &&
+            black == other.black &&
+            white == other.white &&
             variationIndex == other.variationIndex &&
             variationCount == other.variationCount &&
             aiToPlay == other.aiToPlay
@@ -123,10 +152,8 @@ data class SessionSnapshot(
         result = 31 * result + ended.hashCode()
         result = 31 * result + moveNumber
         result = 31 * result + komi.hashCode()
-        result = 31 * result + mode.hashCode()
-        result = 31 * result + rankKyu
-        result = 31 * result + humanPlaysBlack.hashCode()
-        result = 31 * result + aiStyle.hashCode()
+        result = 31 * result + black.hashCode()
+        result = 31 * result + white.hashCode()
         result = 31 * result + variationIndex
         result = 31 * result + variationCount
         result = 31 * result + aiToPlay.hashCode()

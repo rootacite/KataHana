@@ -167,9 +167,6 @@ class StoneLinksTest {
             ended = false,
             moveNumber = 0,
             komi = 7.5f,
-            mode = PlayMode.HumanVsHuman,
-            rankKyu = 5,
-            humanPlaysBlack = true,
         )
     }
 }

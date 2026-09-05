@@ -123,6 +123,9 @@ fun ownershipIndex(point: Point, size: Int): Int = point.index(size)
 fun formatPv(pv: List<String>, limit: Int = PV_DISPLAY_LEN): String =
     pv.take(limit).joinToString(" ")
 
+/** Keep the last shown winrate/score until the new node has a real view. */
+fun heldScalar(incoming: Double?, previous: Double?): Double? = incoming ?: previous
+
 /** Keep the last complete map when the new node has no eval yet. */
 fun heldOwnership(previous: List<Double>, incoming: List<Double>, boardSize: Int): List<Double> {
     val n = boardSize * boardSize

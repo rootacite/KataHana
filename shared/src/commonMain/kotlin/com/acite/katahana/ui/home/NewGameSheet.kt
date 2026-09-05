@@ -6,8 +6,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -21,14 +19,12 @@ import androidx.compose.ui.unit.sp
 import com.acite.katahana.domain.AiStyle
 import com.acite.katahana.domain.GameConfig
 import com.acite.katahana.domain.PlayMode
-import com.acite.katahana.domain.rankLabel
-import com.acite.katahana.domain.rankLongLabel
 import com.acite.katahana.ui.Copy
 import com.acite.katahana.ui.components.CapsuleButton
 import com.acite.katahana.ui.components.CapsuleChoice
 import com.acite.katahana.ui.components.ChoiceRow
+import com.acite.katahana.ui.components.RankLadder
 import com.acite.katahana.ui.theme.HanaColors
-import kotlin.math.roundToInt
 
 @Composable
 fun NewGameSheet(
@@ -88,24 +84,15 @@ fun NewGameSheet(
         if (mode == PlayMode.HumanVsAi) {
             Label(Copy.aiStyle)
             ChoiceRow {
-                CapsuleChoice(Copy.rank, aiStyle == AiStyle.Rank, { aiStyle = AiStyle.Rank }, Modifier.weight(1f))
-                CapsuleChoice(Copy.humanLike, aiStyle == AiStyle.Human, { aiStyle = AiStyle.Human }, Modifier.weight(1f))
-                CapsuleChoice(Copy.fullStrength, aiStyle == AiStyle.Full, { aiStyle = AiStyle.Full }, Modifier.weight(1f))
+                CapsuleChoice(Copy.playerRank, aiStyle == AiStyle.Rank, { aiStyle = AiStyle.Rank }, Modifier.weight(1f))
+                CapsuleChoice(Copy.playerHumanLike, aiStyle == AiStyle.Human, { aiStyle = AiStyle.Human }, Modifier.weight(1f))
+                CapsuleChoice(Copy.playerKatago, aiStyle == AiStyle.Full, { aiStyle = AiStyle.Full }, Modifier.weight(1f))
             }
-            if (aiStyle == AiStyle.Rank || aiStyle == AiStyle.Human) {
-            Label("${Copy.rank}  ${rankLongLabel(rankKyu)}  (${rankLabel(rankKyu)})")
-            Slider(
-                value = (15 - rankKyu).toFloat(),
-                onValueChange = { rankKyu = 15 - it.roundToInt() },
-                valueRange = 0f..17f,
-                steps = 16,
-                colors = SliderDefaults.colors(
-                    thumbColor = HanaColors.accentPink,
-                    activeTrackColor = HanaColors.accentPink,
-                    inactiveTrackColor = HanaColors.stroke,
-                ),
+            RankLadder(
+                godlike = aiStyle == AiStyle.Full,
+                rankKyu = rankKyu,
+                onRankKyu = { rankKyu = it },
             )
-            }
             Label(Copy.youPlay)
             ChoiceRow {
                 CapsuleChoice(Copy.black, humanPlaysBlack, { humanPlaysBlack = true }, Modifier.weight(1f))

@@ -47,8 +47,8 @@ fun PlayActionsBar(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         PlayGlyphButton(PlayGlyph.Pass, Copy.pass, humanTurn, onPass)
-        PlayGlyphButton(PlayGlyph.Undo, Copy.undo, snapshot.canUndo, onUndo)
-        PlayGlyphButton(PlayGlyph.Redo, Copy.redo, snapshot.canRedo, onRedo)
+        PlayGlyphButton(PlayGlyph.Undo, Copy.undo, snapshot.humanControls && snapshot.canUndo, onUndo)
+        PlayGlyphButton(PlayGlyph.Redo, Copy.redo, snapshot.humanControls && snapshot.canRedo, onRedo)
         if (hasSelection) {
             PlayGlyphButton(PlayGlyph.Confirm, Copy.confirm, humanTurn, onConfirm, emphasized = true)
         }
@@ -69,8 +69,8 @@ fun PlayIconCluster(
 ) {
     val buttons: @Composable () -> Unit = {
         PlayGlyphButton(PlayGlyph.Pass, Copy.pass, humanTurn, onPass)
-        PlayGlyphButton(PlayGlyph.Undo, Copy.undo, snapshot.canUndo, onUndo)
-        PlayGlyphButton(PlayGlyph.Redo, Copy.redo, snapshot.canRedo, onRedo)
+        PlayGlyphButton(PlayGlyph.Undo, Copy.undo, snapshot.humanControls && snapshot.canUndo, onUndo)
+        PlayGlyphButton(PlayGlyph.Redo, Copy.redo, snapshot.humanControls && snapshot.canRedo, onRedo)
         if (hasSelection) {
             PlayGlyphButton(PlayGlyph.Confirm, Copy.confirm, humanTurn, onConfirm, emphasized = true)
         }

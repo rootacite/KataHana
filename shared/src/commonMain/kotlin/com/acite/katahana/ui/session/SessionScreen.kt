@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -37,6 +38,7 @@ import cafe.adriel.voyager.navigator.currentOrThrow
 import com.acite.katahana.domain.GameConfig
 import com.acite.katahana.domain.GameTree
 import com.acite.katahana.domain.SessionSnapshot
+import com.acite.katahana.domain.StoneColor
 import com.acite.katahana.engine.EnginePhase
 import com.acite.katahana.getPlatform
 import com.acite.katahana.engine.EngineStatus
@@ -116,6 +118,10 @@ private fun SessionRoute(vm: SessionViewModel) {
     var nameAsk by remember { mutableStateOf(false) }
     var nameThenLeave by remember { mutableStateOf(false) }
     var nameDraft by remember { mutableStateOf("") }
+    var editColor by remember { mutableStateOf<StoneColor?>(null) }
+    LaunchedEffect(drawerOpen, editColor) {
+        vm.setPaused(drawerOpen || editColor != null)
+    }
     val exportSgf: () -> Unit = {
         scope.launch {
             sgfFiles.save(vm.sgfFileName(), vm.sgfText())
@@ -126,6 +132,7 @@ private fun SessionRoute(vm: SessionViewModel) {
         drawerOpen = false
         leaveAsk = false
         nameAsk = false
+        editColor = null
         navigator.pop()
     }
     val requestLeave: () -> Unit = {
@@ -161,7 +168,7 @@ private fun SessionRoute(vm: SessionViewModel) {
     ) {
         val landscape = getPlatform().isMobile && maxWidth > maxHeight
         val chromePad = if (landscape) 4.dp else 8.dp
-        val humanTurn = !ui.aiThinking && !snapshot.ended && !snapshot.aiToPlay
+        val humanTurn = snapshot.humanControls && !snapshot.ended
         val hazeState = rememberHazeState()
         Column(Modifier.fillMaxSize().padding(top = chromePad)) {
             if (!landscape) {
@@ -233,6 +240,7 @@ private fun SessionRoute(vm: SessionViewModel) {
                             drawerOpen = false
                             navigator.push(SettingsScreen())
                         },
+                        onEditSeat = { editColor = it },
                         modifier = Modifier.fillMaxSize(),
                     )
                 },
@@ -343,6 +351,14 @@ private fun SessionRoute(vm: SessionViewModel) {
             initial = nameDraft,
             onConfirm = { performSaveAs(it, nameThenLeave) },
             onCancel = { nameAsk = false },
+        )
+    }
+    editColor?.let { color ->
+        SeatDialog(
+            color = color,
+            seat = snapshot.seat(color),
+            onChange = { vm.setSeat(color, it) },
+            onDismiss = { editColor = null },
         )
     }
 }
