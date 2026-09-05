@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -360,30 +361,43 @@ private fun ChangelogSection(hazeState: dev.chrisbanes.haze.HazeState) {
 
 @Composable
 private fun ChangelogRow(entry: ChangelogEntry) {
-    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        FlowRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            val kind = entry.kind
-            if (kind != null) {
+            entry.gitTags.forEach { tag ->
+                ChangelogChip(tag, HanaColors.accentPink)
+            }
+            entry.kind?.let { kind ->
                 val accent = when (kind.lowercase()) {
                     "feat" -> HanaColors.accentPink
                     "fix" -> HanaColors.accentBlue
+                    "doc" -> HanaColors.qualityMint
                     else -> HanaColors.accentLilac
                 }
-                Box(
-                    Modifier
-                        .clip(hanaTokens.capsule)
-                        .background(accent.copy(alpha = 0.18f))
-                        .padding(horizontal = 8.dp, vertical = 2.dp),
-                ) {
-                    Text(kind, color = accent, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                }
+                ChangelogChip(kind, accent)
             }
-            Text(entry.date, color = HanaColors.textDim, fontSize = 12.sp)
+            Text(
+                entry.date,
+                color = HanaColors.textDim,
+                fontSize = 12.sp,
+                modifier = Modifier.align(Alignment.CenterVertically),
+            )
         }
         Text(entry.title, color = HanaColors.text, fontSize = 14.sp)
+    }
+}
+
+@Composable
+private fun ChangelogChip(label: String, accent: Color) {
+    Box(
+        Modifier
+            .clip(hanaTokens.capsule)
+            .background(accent.copy(alpha = 0.18f))
+            .padding(horizontal = 8.dp, vertical = 2.dp),
+    ) {
+        Text(label, color = accent, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
     }
 }
 

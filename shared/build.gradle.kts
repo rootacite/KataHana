@@ -10,21 +10,38 @@ plugins {
 }
 
 val generateHanaInfo by tasks.registering {
-    val version = providers.gradleProperty("hana.version").orElse("1.0")
     val gitHash = providers.exec {
         commandLine("git", "rev-parse", "--short", "HEAD")
         workingDir(rootProject.rootDir)
         isIgnoreExitValue = true
     }.standardOutput.asText.map { it.trim().ifBlank { "dev" } }
+    val gitVersion = providers.exec {
+        commandLine("git", "describe", "--tags", "--abbrev=0")
+        workingDir(rootProject.rootDir)
+        isIgnoreExitValue = true
+    }.standardOutput.asText.map { raw ->
+        raw.trim().ifBlank { "v0.1-alpha" }
+    }
+    val gitTagRefs = providers.exec {
+        commandLine(
+            "git",
+            "for-each-ref",
+            "--format=%(if)%(*objectname)%(then)%(*objectname)%(else)%(objectname)%(end)|%(refname:short)",
+            "refs/tags",
+        )
+        workingDir(rootProject.rootDir)
+        isIgnoreExitValue = true
+    }.standardOutput.asText.map { it.trim() }
     val changelog = providers.exec {
-        commandLine("git", "log", "-n", "40", "--pretty=format:%h|%ad|%s", "--date=short")
+        commandLine("git", "log", "-n", "40", "--pretty=format:%H|%h|%ad|%s", "--date=short")
         workingDir(rootProject.rootDir)
         isIgnoreExitValue = true
     }.standardOutput.asText.map { it.trim() }
     val outputDir = layout.buildDirectory.dir("generated/hanaInfo/kotlin")
 
-    inputs.property("version", version)
+    inputs.property("gitVersion", gitVersion)
     inputs.property("gitHash", gitHash)
+    inputs.property("gitTagRefs", gitTagRefs)
     inputs.property("changelog", changelog)
     outputs.dir(outputDir)
 
@@ -46,16 +63,33 @@ val generateHanaInfo by tasks.registering {
             }
             append('"')
         }
+        fun List<String>.kotlinList(): String =
+            if (isEmpty()) "emptyList()"
+            else "listOf(${joinToString { it.kotlinString() }})"
+
+        val tagsByCommit = HashMap<String, MutableList<String>>()
+        gitTagRefs.get().lineSequence().forEach { line ->
+            val sep = line.indexOf('|')
+            if (sep <= 0) return@forEach
+            val commit = line.substring(0, sep).trim()
+            val tag = line.substring(sep + 1).trim()
+            if (commit.isEmpty() || tag.isEmpty()) return@forEach
+            tagsByCommit.getOrPut(commit) { ArrayList() }.add(tag)
+        }
+
         val entries = changelog.get().lineSequence()
             .map { it.trim() }
-            .filter { it.isNotEmpty() && it.count { c -> c == '|' } >= 2 }
+            .filter { it.isNotEmpty() && it.count { c -> c == '|' } >= 3 }
             .joinToString(",\n        ") { line ->
                 val first = line.indexOf('|')
                 val second = line.indexOf('|', first + 1)
-                val hash = line.substring(0, first)
-                val date = line.substring(first + 1, second)
-                val subject = line.substring(second + 1)
-                "ChangelogEntry(${hash.kotlinString()}, ${date.kotlinString()}, ${subject.kotlinString()})"
+                val third = line.indexOf('|', second + 1)
+                val full = line.substring(0, first)
+                val hash = line.substring(first + 1, second)
+                val date = line.substring(second + 1, third)
+                val subject = line.substring(third + 1)
+                val tags = tagsByCommit[full].orEmpty().distinct()
+                "ChangelogEntry(${hash.kotlinString()}, ${date.kotlinString()}, ${subject.kotlinString()}, ${tags.kotlinList()})"
             }
         val body = buildString {
             appendLine("package com.acite.katahana.generated")
@@ -63,7 +97,7 @@ val generateHanaInfo by tasks.registering {
             appendLine("import com.acite.katahana.changelog.ChangelogEntry")
             appendLine()
             appendLine("object AppInfo {")
-            appendLine("    const val version: String = ${version.get().kotlinString()}")
+            appendLine("    const val version: String = ${gitVersion.get().kotlinString()}")
             appendLine("    const val gitHash: String = ${gitHash.get().kotlinString()}")
             appendLine("    val changelog: List<ChangelogEntry> = listOf(")
             if (entries.isNotEmpty()) {

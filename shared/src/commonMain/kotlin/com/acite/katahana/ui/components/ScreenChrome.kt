@@ -64,7 +64,7 @@ fun BrandMark(
                 lineHeight = if (compact) 26.sp else 32.sp,
             )
             Text(
-                "v${AppInfo.version}  ·  ${AppInfo.gitHash}",
+                "${AppInfo.version}  ·  ${AppInfo.gitHash}",
                 color = HanaColors.textDim,
                 fontSize = 12.sp,
             )
@@ -82,7 +82,7 @@ fun ScreenHeader(
     title: String,
     onBack: (() -> Unit)?,
     modifier: Modifier = Modifier,
-    subtitle: String? = "${Copy.appName}  ·  v${AppInfo.version}",
+    subtitle: String? = "${Copy.appName}  ·  ${AppInfo.version}",
 ) {
     Column(modifier.fillMaxWidth()) {
         if (onBack != null) QuietTextButton(Copy.back, onClick = onBack)
