@@ -34,6 +34,8 @@ data class AnalysisQuery(
 @Serializable
 data class OverrideSettings(
     val reportAnalysisWinratesAs: String = "BLACK",
+    val humanSLProfile: String? = null,
+    val ignorePreRootHistory: Boolean? = null,
 )
 
 @Serializable
@@ -56,6 +58,7 @@ data class AnalysisResponse(
     val rootInfo: RootInfo? = null,
     val moveInfos: List<MoveInfo> = emptyList(),
     val policy: List<Double> = emptyList(),
+    val humanPolicy: List<Double> = emptyList(),
     val ownership: List<Double> = emptyList(),
 )
 

@@ -17,7 +17,7 @@
 
 KataHana is a Go board that stays on your device. The rules, the game tree, the stones, the records — all of it is local, with no server to join and no account to keep. KataGo is a welcome guest rather than a requirement: the client speaks the engine's Analysis JSON over a plain WebSocket, so you can pair it with whichever KataGo build you like — or with none at all. When the engine is away, Human vs Human plays exactly the same game.
 
-When you do invite the AI in, you decide who sits across from you. Pick a rank from 15 kyu to 3 dan (5 kyu by default) and face someone of that strength — human-sized mistakes included — or go **Full** and let the engine show you its strongest move.
+When you do invite the AI in, you decide who sits across from you. **Human** (the default) samples KataGo's human-SL net at 15 kyu to 3 dan, so local fights can miss the way a person of that rank would. **Rank** is KaTrain's older policy lottery — sharp in tactics, looser in direction. **Full** plays the engine's strongest move.
 
 And it looks like the game finally got permission to stay up late. No wood grain, no museum beige. The whole app is dressed for the night — deep purples, sakura pink — and the default stones, clear-sky blue against cherry blossom, still hold up against the dark.
 
@@ -89,7 +89,7 @@ A new game starts with the questions you would ask yourself anyway: how big the 
 | **Boards** | 9×9, 13×13, 19×19 |
 | **Rules** | Chinese, positional superko, GTP coordinates (skip I) |
 | **Human vs Human** | Same device, no network |
-| **Human vs AI** | **Rank** — KaTrain-calibrated policy lottery (`maxVisits=1`), 15k to 3d, 5k by default. **Full** — KataGo's top move at your play visits. |
+| **Human vs AI** | **Human** — sample KataGo `humanPolicy` at `preaz_{rank}` (`maxVisits=1`), 15k to 3d, 5k by default. **Rank** — KaTrain-calibrated policy lottery. **Full** — KataGo's top move at your play visits. |
 | **Review** | Undo, redo, or tap the tree. Off the latest move you are reviewing; on a non-leaf node the next stone is yours. |
 | **Eval** | Live Score / Winrate graph and a Good–Blunder table, bound to the saved game. |
 | **Analysis** | Live top moves with PV, score loss, and visits. **Analyze game** queues the preferred line. |
@@ -128,11 +128,20 @@ The engine client is a plain WebSocket, so “installing AI” means pointing it
 ws://127.0.0.1:2080
 ```
 
+This repo ships a gateway that speaks that URL. From the project root:
+
+```bash
+pip install -r engine/requirements.txt
+python engine/server.py --katago /path/to/katago
+```
+
+The first run creates `model/` if needed and downloads the main net (`b10c384h6nbttflrs`) plus the human-SL net (`b18c384nbt-humanv0`) from KataGo's GitHub releases. Config lives at `engine/analysis.cfg`; KataGo's cache goes in `engine/home/`. The binary itself is GPU-specific, so it is not fetched — pass `--katago`, drop a binary at `engine/bin/katago`, or have `katago` on your `PATH`. `--skip-download` skips the net fetch if you already placed the files.
+
 <p align="center">
   <img src="screenshots/engine.jpg" alt="Engine settings — WebSocket URL, play visits, review visits, test connection"/>
 </p>
 
-Every frame is one JSON object in KataGo's own shape — `rootInfo`, `moveInfos`, `ownership`, `policy` — so there is no second protocol to keep in sync. Winrates are stored as Black throughout. Rank queries ask the engine for policy at a single visit; live analysis, full-strength genmove, and queued review use the play and review visits you set for the profile. Engine offline? Human vs Human carries on regardless — the analysis chrome simply goes quiet.
+Every frame is one JSON object in KataGo's own shape — `rootInfo`, `moveInfos`, `ownership`, `policy`, `humanPolicy` — so there is no second protocol to keep in sync. Winrates are stored as Black throughout. Human and Rank queries ask the engine for policy at a single visit (Human also sets `humanSLProfile` on that query only); live analysis, full-strength genmove, and queued review use the play and review visits you set for the profile. Engine offline? Human vs Human carries on regardless — the analysis chrome simply goes quiet.
 
 ---
 
@@ -144,6 +153,13 @@ The desktop app is one command away:
 ./gradlew :desktopApp:run
 # hot reload
 ./gradlew :desktopApp:hotRun --auto
+```
+
+The local KataGo WebSocket gateway (nets land in `model/` on first run):
+
+```bash
+pip install -r engine/requirements.txt
+python engine/server.py --katago /path/to/katago
 ```
 
 On iOS, open [`iosApp/`](./iosApp) in Xcode.
@@ -237,7 +253,7 @@ Compose Multiplatform, with the game logic in `shared` and thin launchers in `an
 shared/src/commonMain/kotlin/com/acite/katahana/
   domain/     game tree, rules, connections, eval series
   engine/     WebSocket client, Analysis JSON, ownership
-  ai/         RankBot, FullStrengthBot, quality bands
+  ai/         HumanBot, RankBot, FullStrengthBot, quality bands
   settings/   preferences and ownership styles
   recents/    Save / Save as shelf, persisted evals
   changelog/  git tags into the home log

@@ -22,6 +22,18 @@ object FakeAnalysisServer {
         } else {
             ""
         }
+        val policyJson = if (query.includePolicy && n > 0) {
+            val rest = if (n <= 1) 0.0 else 0.4 / (n - 1)
+            val values = (0 until n).joinToString(",") { i ->
+                val t = if (i == n / 2) 0.5 else rest
+                (kotlin.math.round(t * 10000.0) / 10000.0).toString()
+            }
+            """,
+              "policy": [$values,0.01],
+              "humanPolicy": [$values,0.02]"""
+        } else {
+            ""
+        }
         return """
             {
               "id": "${query.id}",
@@ -76,7 +88,7 @@ object FakeAnalysisServer {
                   "visits": 1,
                   "winrate": 0.0454937462
                 }
-              ]$ownershipJson
+              ]$ownershipJson$policyJson
             }
         """.trimIndent()
     }

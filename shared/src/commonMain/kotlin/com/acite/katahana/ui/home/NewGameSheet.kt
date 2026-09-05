@@ -89,9 +89,10 @@ fun NewGameSheet(
             Label(Copy.aiStyle)
             ChoiceRow {
                 CapsuleChoice(Copy.rank, aiStyle == AiStyle.Rank, { aiStyle = AiStyle.Rank }, Modifier.weight(1f))
+                CapsuleChoice(Copy.humanLike, aiStyle == AiStyle.Human, { aiStyle = AiStyle.Human }, Modifier.weight(1f))
                 CapsuleChoice(Copy.fullStrength, aiStyle == AiStyle.Full, { aiStyle = AiStyle.Full }, Modifier.weight(1f))
             }
-            if (aiStyle == AiStyle.Rank) {
+            if (aiStyle == AiStyle.Rank || aiStyle == AiStyle.Human) {
             Label("${Copy.rank}  ${rankLongLabel(rankKyu)}  (${rankLabel(rankKyu)})")
             Slider(
                 value = (15 - rankKyu).toFloat(),

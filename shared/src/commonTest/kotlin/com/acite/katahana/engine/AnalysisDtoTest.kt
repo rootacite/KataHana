@@ -86,7 +86,19 @@ class AnalysisDtoTest {
         assertTrue(encoded.contains("[\"B\",\"Q16\"]"))
         assertTrue(encoded.contains("\"overrideSettings\""))
         assertTrue(encoded.contains("\"reportAnalysisWinratesAs\":\"BLACK\""))
+        assertFalse(encoded.contains("humanSLProfile"))
+        assertFalse(encoded.contains("ignorePreRootHistory"))
         assertFalse(encoded.contains("ownershipMap"))
+    }
+
+    @Test
+    fun parsesHumanPolicyWhenRequested() {
+        val query = buildHumanQuery("s", "n0", "1", GameTree(9), rankKyu = 5)
+        val json = FakeAnalysisServer.reply(analysisJson.encodeToString(AnalysisQuery.serializer(), query))
+        val response = analysisJson.decodeFromString(AnalysisResponse.serializer(), json)
+        assertEquals(82, response.humanPolicy.size)
+        assertEquals(82, response.policy.size)
+        assertTrue(response.humanPolicy[40] > 0.4)
     }
 
     @Test

@@ -339,7 +339,11 @@ fun StatusCard(snapshot: SessionSnapshot) {
             fontSize = 13.sp,
         )
         if (snapshot.mode == PlayMode.HumanVsAi) {
-            val style = if (snapshot.aiStyle == AiStyle.Full) Copy.fullStrength else "Rank ${rankLabel(snapshot.rankKyu)}"
+            val style = when (snapshot.aiStyle) {
+                AiStyle.Full -> Copy.fullStrength
+                AiStyle.Rank -> "Rank ${rankLabel(snapshot.rankKyu)}"
+                AiStyle.Human -> "${Copy.humanLike} ${rankLabel(snapshot.rankKyu)}"
+            }
             Text(
                 style,
                 color = HanaColors.accentLilac,

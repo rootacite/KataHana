@@ -3,6 +3,9 @@ package com.acite.katahana.ui.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.acite.katahana.engine.AnalysisClient
+import com.acite.katahana.engine.BenchUiState
+import com.acite.katahana.engine.BenchmarkResult
+import com.acite.katahana.engine.BenchmarkStep
 import com.acite.katahana.engine.EngineProfile
 import com.acite.katahana.engine.EngineStatus
 import com.acite.katahana.engine.TestResult
@@ -53,6 +56,8 @@ class SettingsViewModel(
     val testBusy: StateFlow<Boolean> = _testBusy.asStateFlow()
     private val _testMessage = MutableStateFlow<String?>(null)
     val testMessage: StateFlow<String?> = _testMessage.asStateFlow()
+    private val _benchState = MutableStateFlow<BenchUiState>(BenchUiState.Idle)
+    val benchState: StateFlow<BenchUiState> = _benchState.asStateFlow()
     val engineToken: StateFlow<String> = repo.engineToken.stateIn(
         viewModelScope, SharingStarted.WhileSubscribed(1_000), "",
     )
@@ -88,6 +93,7 @@ class SettingsViewModel(
 
     fun testConnection() {
         if (_testBusy.value) return
+        if (_benchState.value is BenchUiState.Running) return
         viewModelScope.launch {
             _testBusy.value = true
             _testMessage.value = Copy.testingConnection
@@ -97,6 +103,29 @@ class SettingsViewModel(
             }
             _testBusy.value = false
         }
+    }
+
+    fun runBenchmark() {
+        if (_testBusy.value) return
+        if (_benchState.value is BenchUiState.Running) return
+        if (!analysis.status.value.online) return
+        viewModelScope.launch {
+            _benchState.value = BenchUiState.Running(Copy.benchmarkWarmup)
+            val result = analysis.runBenchmark(playVisits.value, onStep = { step ->
+                _benchState.value = BenchUiState.Running(benchmarkStepLabel(step))
+            })
+            _benchState.value = when (result) {
+                is BenchmarkResult.Ok -> BenchUiState.Done(result.report)
+                is BenchmarkResult.Fail -> BenchUiState.Failed(result.message)
+            }
+        }
+    }
+
+    private fun benchmarkStepLabel(step: BenchmarkStep): String = when (step) {
+        BenchmarkStep.Warmup -> Copy.benchmarkWarmup
+        is BenchmarkStep.Latency -> Copy.benchmarkLatency(step.done, step.total)
+        is BenchmarkStep.Search -> Copy.benchmarkSearchVisits(step.visits)
+        BenchmarkStep.Human -> Copy.benchmarkHuman
     }
 
     private fun launch(block: suspend () -> Unit) {

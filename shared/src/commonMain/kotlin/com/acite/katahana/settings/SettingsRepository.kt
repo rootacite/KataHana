@@ -8,9 +8,10 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
-import com.acite.katahana.domain.AiStyle
 import com.acite.katahana.domain.GameConfig
 import com.acite.katahana.domain.PlayMode
+import com.acite.katahana.domain.parseAiStyle
+import com.acite.katahana.domain.toStorageId
 import com.acite.katahana.engine.EngineProfile
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
@@ -84,7 +85,7 @@ class SettingsRepository {
             mode = if (prefs[Keys.LAST_MODE] == "hvai") PlayMode.HumanVsAi else PlayMode.HumanVsHuman,
             rankKyu = (prefs[Keys.LAST_RANK] ?: 5).coerceIn(-2, 15),
             humanPlaysBlack = prefs[Keys.LAST_HUMAN_BLACK] ?: true,
-            aiStyle = if (prefs[Keys.LAST_AI] == "full") AiStyle.Full else AiStyle.Rank,
+            aiStyle = parseAiStyle(prefs[Keys.LAST_AI]),
         )
     }
 
@@ -109,7 +110,7 @@ class SettingsRepository {
         it[Keys.LAST_MODE] = if (value.mode == PlayMode.HumanVsAi) "hvai" else "hvh"
         it[Keys.LAST_RANK] = value.rankKyu
         it[Keys.LAST_HUMAN_BLACK] = value.humanPlaysBlack
-        it[Keys.LAST_AI] = if (value.aiStyle == AiStyle.Full) "full" else "rank"
+        it[Keys.LAST_AI] = value.aiStyle.toStorageId()
     }
 
     suspend fun setQuality(value: QualityThresholds) = edit {

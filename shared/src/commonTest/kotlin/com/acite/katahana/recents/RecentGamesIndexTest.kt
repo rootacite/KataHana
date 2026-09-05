@@ -90,6 +90,16 @@ class RecentGamesIndexTest {
         assertEquals(PlayMode.HumanVsAi, config.mode)
         assertEquals(AiStyle.Full, config.aiStyle)
         assertEquals(false, config.humanPlaysBlack)
+        val human = GameConfig(
+            boardSize = 19,
+            mode = PlayMode.HumanVsAi,
+            rankKyu = 5,
+            aiStyle = AiStyle.Human,
+        )
+        assertEquals("19×19 · vs 5k", defaultRecentTitle(human))
+        assertEquals("human", human.toRecentAiStyle())
+        assertEquals(AiStyle.Human, sample("h", "H").copy(aiStyle = "human").toConfig().aiStyle)
+        assertEquals(AiStyle.Rank, sample("r", "R").copy(aiStyle = "rank").toConfig().aiStyle)
     }
 
     @Test

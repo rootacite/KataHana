@@ -8,6 +8,7 @@ enum class PlayMode {
 }
 
 enum class AiStyle {
+    Human,
     Rank,
     Full,
 }
@@ -18,7 +19,7 @@ data class GameConfig(
     val mode: PlayMode = PlayMode.HumanVsHuman,
     val rankKyu: Int = 5,
     val humanPlaysBlack: Boolean = true,
-    val aiStyle: AiStyle = AiStyle.Rank,
+    val aiStyle: AiStyle = AiStyle.Human,
 ) : JavaSerializable {
     init {
         require(boardSize == 9 || boardSize == 13 || boardSize == 19)
@@ -36,4 +37,18 @@ fun rankLongLabel(kyu: Int): String = when {
     kyu > 0 -> "$kyu kyu"
     kyu == 0 -> "1 dan"
     else -> "${1 - kyu} dan"
+}
+
+fun humanSlProfile(kyu: Int): String = "preaz_${rankLabel(kyu)}"
+
+fun parseAiStyle(id: String?): AiStyle = when (id) {
+    "full" -> AiStyle.Full
+    "rank" -> AiStyle.Rank
+    else -> AiStyle.Human
+}
+
+fun AiStyle.toStorageId(): String = when (this) {
+    AiStyle.Full -> "full"
+    AiStyle.Rank -> "rank"
+    AiStyle.Human -> "human"
 }

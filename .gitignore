@@ -17,3 +17,11 @@ captures
 !*.xcworkspace/contents.xcworkspacedata
 **/xcshareddata/WorkspaceSettings.xcsettings
 node_modules/
+
+# KataGo nets and engine scratch (downloaded / machine-local)
+model/*.bin.gz
+model/*.part
+engine/home/
+engine/bin/
+engine/__pycache__/
+*.pyc

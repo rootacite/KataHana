@@ -3,6 +3,7 @@ package com.acite.katahana.engine
 import com.acite.katahana.domain.GameTree
 import com.acite.katahana.domain.Move
 import com.acite.katahana.domain.StoneColor
+import com.acite.katahana.domain.humanSlProfile
 
 const val ANALYSIS_PV_LEN = 12
 
@@ -87,6 +88,35 @@ fun buildRankQuery(
     )
 }
 
+fun buildHumanQuery(
+    sessionId: String,
+    nodeId: String,
+    nonce: String,
+    tree: GameTree,
+    rankKyu: Int,
+    maxVisits: Int = 1,
+): AnalysisQuery {
+    val moves = tree.lineMoves().map { it.toGtpPair(tree.size) }
+    return AnalysisQuery(
+        id = "$sessionId:$nodeId:human:$nonce",
+        rules = tree.rules,
+        komi = tree.komi.toDouble(),
+        boardXSize = tree.size,
+        boardYSize = tree.size,
+        moves = moves,
+        analyzeTurns = listOf(moves.size),
+        maxVisits = maxVisits,
+        includeOwnership = true,
+        includePolicy = true,
+        reportDuringSearchEvery = 0.4,
+        overrideSettings = OverrideSettings(
+            reportAnalysisWinratesAs = "BLACK",
+            humanSLProfile = humanSlProfile(rankKyu),
+            ignorePreRootHistory = false,
+        ),
+    )
+}
+
 fun buildGenmoveQuery(
     sessionId: String,
     nodeId: String,
@@ -122,4 +152,42 @@ fun buildTestQuery(id: String): AnalysisQuery = AnalysisQuery(
     includeOwnership = false,
     includePolicy = false,
     reportDuringSearchEvery = null,
+)
+
+private fun benchBoard(id: String, maxVisits: Int, includePolicy: Boolean): AnalysisQuery = AnalysisQuery(
+    id = id,
+    rules = "chinese",
+    komi = 7.5,
+    boardXSize = 19,
+    boardYSize = 19,
+    moves = emptyList(),
+    analyzeTurns = listOf(0),
+    maxVisits = maxVisits,
+    includeOwnership = true,
+    includePolicy = includePolicy,
+    reportDuringSearchEvery = null,
+)
+
+fun buildBenchPolicyQuery(id: String): AnalysisQuery = benchBoard(id, maxVisits = 1, includePolicy = true)
+
+fun buildBenchSearchQuery(id: String, visits: Int = BENCH_PLAY_VISITS): AnalysisQuery =
+    benchBoard(id, maxVisits = visits, includePolicy = false)
+
+fun buildBenchHumanQuery(id: String): AnalysisQuery = AnalysisQuery(
+    id = id,
+    rules = "chinese",
+    komi = 7.5,
+    boardXSize = 19,
+    boardYSize = 19,
+    moves = emptyList(),
+    analyzeTurns = listOf(0),
+    maxVisits = 1,
+    includeOwnership = true,
+    includePolicy = true,
+    reportDuringSearchEvery = null,
+    overrideSettings = OverrideSettings(
+        reportAnalysisWinratesAs = "BLACK",
+        humanSLProfile = humanSlProfile(5),
+        ignorePreRootHistory = false,
+    ),
 )

@@ -3,6 +3,7 @@ package com.acite.katahana.ui.session
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.acite.katahana.ai.FullStrengthBot
+import com.acite.katahana.ai.HumanBot
 import com.acite.katahana.ai.QualityMark
 import com.acite.katahana.ai.RankBot
 import com.acite.katahana.ai.bandForLoss
@@ -493,6 +494,12 @@ class SessionViewModel(
                 val toPlay = session.position.toPlay
                 val nodeId = session.tree.current.id
                 val move = when (config.aiStyle) {
+                    AiStyle.Human -> {
+                        val response = analysis.queryHuman(sessionId, session.tree, config.rankKyu)
+                        storeEval(nodeId, response, toPlay)
+                        _state.update { it.withAnalysis() }
+                        HumanBot.choose(response.humanPolicy, session.position, Random.Default)
+                    }
                     AiStyle.Rank -> {
                         val response = analysis.queryRank(sessionId, session.tree)
                         storeEval(nodeId, response, toPlay)

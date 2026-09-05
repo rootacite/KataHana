@@ -3,7 +3,9 @@ package com.acite.katahana.recents
 import com.acite.katahana.domain.AiStyle
 import com.acite.katahana.domain.GameConfig
 import com.acite.katahana.domain.PlayMode
+import com.acite.katahana.domain.parseAiStyle
 import com.acite.katahana.domain.rankLabel
+import com.acite.katahana.domain.toStorageId
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -29,7 +31,7 @@ data class RecentGame(
         mode = if (mode == "hvai") PlayMode.HumanVsAi else PlayMode.HumanVsHuman,
         rankKyu = rankKyu.coerceIn(-2, 15),
         humanPlaysBlack = humanPlaysBlack,
-        aiStyle = if (aiStyle == "full") AiStyle.Full else AiStyle.Rank,
+        aiStyle = parseAiStyle(aiStyle),
     )
 
     fun modeLine(): String {
@@ -55,8 +57,7 @@ data class PersistedEval(
 fun GameConfig.toRecentMode(): String =
     if (mode == PlayMode.HumanVsAi) "hvai" else "hvh"
 
-fun GameConfig.toRecentAiStyle(): String =
-    if (aiStyle == AiStyle.Full) "full" else "rank"
+fun GameConfig.toRecentAiStyle(): String = aiStyle.toStorageId()
 
 fun defaultRecentTitle(config: GameConfig): String = when (config.mode) {
     PlayMode.HumanVsHuman -> "${config.boardSize}×${config.boardSize} · Human vs Human"

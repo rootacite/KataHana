@@ -76,7 +76,7 @@ data class SessionSnapshot(
     val mode: PlayMode,
     val rankKyu: Int,
     val humanPlaysBlack: Boolean,
-    val aiStyle: AiStyle = AiStyle.Rank,
+    val aiStyle: AiStyle = AiStyle.Human,
     val variationIndex: Int = 0,
     val variationCount: Int = 1,
     val aiToPlay: Boolean = false,

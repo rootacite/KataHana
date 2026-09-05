@@ -55,6 +55,37 @@ class QueryBuilderTest {
         assertEquals(1, query.maxVisits)
         assertEquals(listOf(0), query.analyzeTurns)
         assertEquals(0.4, query.reportDuringSearchEvery)
+        assertEquals(null, query.overrideSettings.humanSLProfile)
+    }
+
+    @Test
+    fun humanQueryAsksHumanPolicyAtOneVisit() {
+        val tree = GameTree(9)
+        val query = buildHumanQuery("sess", tree.current.id, "1", tree, rankKyu = 5)
+        assertTrue(query.id.contains(":human:"))
+        assertEquals(true, query.includePolicy)
+        assertEquals(true, query.includeOwnership)
+        assertEquals(1, query.maxVisits)
+        assertEquals("preaz_5k", query.overrideSettings.humanSLProfile)
+        assertEquals(false, query.overrideSettings.ignorePreRootHistory)
+        val encoded = analysisJson.encodeToString(AnalysisQuery.serializer(), query)
+        assertTrue(encoded.contains("\"humanSLProfile\":\"preaz_5k\""))
+        assertTrue(encoded.contains("\"ignorePreRootHistory\":false"))
+        val live = analysisJson.encodeToString(
+            AnalysisQuery.serializer(),
+            buildLiveQuery("sess", tree.current.id, "1", tree, maxVisits = 8),
+        )
+        assertTrue(!live.contains("humanSLProfile"))
+        val rank = analysisJson.encodeToString(
+            AnalysisQuery.serializer(),
+            buildRankQuery("sess", tree.current.id, "1", tree),
+        )
+        assertTrue(!rank.contains("humanSLProfile"))
+        val gen = analysisJson.encodeToString(
+            AnalysisQuery.serializer(),
+            buildGenmoveQuery("sess", tree.current.id, "1", tree, maxVisits = 400),
+        )
+        assertTrue(!gen.contains("humanSLProfile"))
     }
 
     @Test
@@ -66,6 +97,42 @@ class QueryBuilderTest {
         assertEquals(false, query.includePolicy)
         assertEquals(true, query.includeOwnership)
         assertEquals(0.4, query.reportDuringSearchEvery)
+    }
+
+    @Test
+    fun benchQueriesUseEmptyNineteenAndNoLiveReports() {
+        val policy = buildBenchPolicyQuery("bench:policy:0:ab")
+        assertEquals("bench:policy:0:ab", policy.id)
+        assertEquals(19, policy.boardXSize)
+        assertEquals(19, policy.boardYSize)
+        assertEquals(emptyList(), policy.moves)
+        assertEquals(listOf(0), policy.analyzeTurns)
+        assertEquals(1, policy.maxVisits)
+        assertEquals(true, policy.includePolicy)
+        assertEquals(true, policy.includeOwnership)
+        assertEquals(null, policy.reportDuringSearchEvery)
+        assertEquals(null, policy.overrideSettings.humanSLProfile)
+
+        val search = buildBenchSearchQuery("bench:search:cd")
+        assertEquals(BENCH_PLAY_VISITS, search.maxVisits)
+        assertEquals(false, search.includePolicy)
+        assertEquals(true, search.includeOwnership)
+        assertEquals(null, search.reportDuringSearchEvery)
+        assertEquals(19, search.boardXSize)
+        val stress = buildBenchSearchQuery("bench:search:2000:cd", BENCH_STRESS_VISITS)
+        assertEquals(2_000, stress.maxVisits)
+        assertEquals(false, stress.includePolicy)
+        assertEquals(19, stress.boardXSize)
+
+        val human = buildBenchHumanQuery("bench:human:ef")
+        assertEquals(1, human.maxVisits)
+        assertEquals(true, human.includePolicy)
+        assertEquals("preaz_5k", human.overrideSettings.humanSLProfile)
+        assertEquals(false, human.overrideSettings.ignorePreRootHistory)
+        val encoded = analysisJson.encodeToString(AnalysisQuery.serializer(), human)
+        assertTrue(encoded.contains("\"humanSLProfile\":\"preaz_5k\""))
+        val policyJson = analysisJson.encodeToString(AnalysisQuery.serializer(), policy)
+        assertTrue(!policyJson.contains("humanSLProfile"))
     }
 
     @Test

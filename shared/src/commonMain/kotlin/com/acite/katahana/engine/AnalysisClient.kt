@@ -1,5 +1,6 @@
 package com.acite.katahana.engine
 
+import com.acite.katahana.ai.HumanBot
 import com.acite.katahana.domain.GameTree
 import com.acite.katahana.domain.Node
 import com.acite.katahana.domain.StoneColor
@@ -25,6 +26,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlin.time.TimeSource
 
 @Inject
 @SingleIn(AppScope::class)
@@ -139,6 +142,25 @@ class AnalysisClient(
         return response
     }
 
+    suspend fun queryHuman(sessionId: String, tree: GameTree, rankKyu: Int): AnalysisResponse {
+        val nonce = Random.nextLong().toULong().toString(16)
+        val nodeId = tree.current.id
+        val query = buildHumanQuery(
+            sessionId,
+            nodeId,
+            nonce,
+            tree,
+            rankKyu,
+        )
+        val response = sendAndAwaitFinal(
+            query,
+            InFlight(query.id, sessionId, nodeId, tree.size, tree.current.position.toPlay),
+        )
+        if (response.error != null) error(response.error)
+        if (response.humanPolicy.isEmpty()) error(HumanBot.MISSING_POLICY)
+        return response
+    }
+
     suspend fun queryReview(sessionId: String, tree: GameTree, node: Node): AnalysisResponse {
         val nonce = Random.nextLong().toULong().toString(16)
         val query = buildReviewQuery(
@@ -210,6 +232,96 @@ class AnalysisClient(
         )
     }
 
+    suspend fun runBenchmark(
+        playVisits: Int,
+        onStep: (BenchmarkStep) -> Unit = {},
+    ): BenchmarkResult {
+        if (!_status.value.online) return BenchmarkResult.Fail("Engine offline")
+        sendMutex.withLock { terminateLive() }
+        _status.value = EngineStatus(EnginePhase.Analyzing)
+        try {
+            onStep(BenchmarkStep.Warmup)
+            val warmup = queryOnce(
+                buildTestQuery("bench:warmup:${nonce()}"),
+                BENCH_POLICY_TIMEOUT_MS,
+            )
+            if (warmup.error != null) {
+                return BenchmarkResult.Fail(warmup.error)
+            }
+
+            val policyMs = ArrayList<Long>(BENCH_POLICY_SAMPLES)
+            repeat(BENCH_POLICY_SAMPLES) { i ->
+                onStep(BenchmarkStep.Latency(i + 1, BENCH_POLICY_SAMPLES))
+                val mark = TimeSource.Monotonic.markNow()
+                val response = queryOnce(
+                    buildBenchPolicyQuery("bench:policy:$i:${nonce()}"),
+                    BENCH_POLICY_TIMEOUT_MS,
+                )
+                if (response.error != null) {
+                    return BenchmarkResult.Fail(response.error)
+                }
+                policyMs += mark.elapsedNow().inWholeMilliseconds.coerceAtLeast(1L)
+            }
+
+            val searches = ArrayList<SearchSample>(BENCH_SEARCH_LADDER.size)
+            for (visits in BENCH_SEARCH_LADDER) {
+                onStep(BenchmarkStep.Search(visits))
+                val searchMark = TimeSource.Monotonic.markNow()
+                val search = queryOnce(
+                    buildBenchSearchQuery("bench:search:$visits:${nonce()}", visits),
+                    benchSearchTimeoutMs(visits),
+                )
+                if (search.error != null) {
+                    return BenchmarkResult.Fail(search.error)
+                }
+                searches += SearchSample(
+                    requestedVisits = visits,
+                    actualVisits = search.rootInfo?.visits ?: 0,
+                    elapsedMs = searchMark.elapsedNow().inWholeMilliseconds.coerceAtLeast(1L),
+                )
+            }
+
+            onStep(BenchmarkStep.Human)
+            var humanMs: Long? = null
+            var humanPolicyPresent = false
+            try {
+                val humanMark = TimeSource.Monotonic.markNow()
+                val human = queryOnce(
+                    buildBenchHumanQuery("bench:human:${nonce()}"),
+                    BENCH_POLICY_TIMEOUT_MS,
+                )
+                if (human.error == null && human.humanPolicy.isNotEmpty()) {
+                    humanMs = humanMark.elapsedNow().inWholeMilliseconds.coerceAtLeast(1L)
+                    humanPolicyPresent = true
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                // Human net is optional; latency/search still decide the verdict.
+            }
+
+            return BenchmarkResult.Ok(
+                assembleReport(
+                    policyMs = policyMs,
+                    searches = searches,
+                    playVisits = playVisits.coerceAtLeast(1),
+                    humanMs = humanMs,
+                    humanPolicyPresent = humanPolicyPresent,
+                ),
+            )
+        } catch (e: TimeoutCancellationException) {
+            return BenchmarkResult.Fail(e.message ?: "Timed out")
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            return BenchmarkResult.Fail(e.message ?: "Benchmark failed")
+        } finally {
+            if (_status.value.phase == EnginePhase.Analyzing) {
+                _status.value = EngineStatus(EnginePhase.Ready)
+            }
+        }
+    }
+
     suspend fun testConnection(): TestResult {
         val profile = settings.engineProfile.first()
         currentProfile = profile
@@ -231,6 +343,26 @@ class AnalysisClient(
             return TestResult.Fail(e.message ?: "Connection failed")
         } finally {
             waitersMutex.withLock { waiters.remove(id) }
+        }
+    }
+
+    private fun nonce(): String = Random.nextLong().toULong().toString(16)
+
+    private suspend fun queryOnce(query: AnalysisQuery, timeoutMs: Long): AnalysisResponse {
+        val deferred = CompletableDeferred<AnalysisResponse>()
+        waitersMutex.withLock { waiters[query.id] = deferred }
+        try {
+            awaitOnline()
+            sendMutex.withLock {
+                sendJson(analysisJson.encodeToString(AnalysisQuery.serializer(), query))
+            }
+            return try {
+                withTimeout(timeoutMs) { deferred.await() }
+            } catch (e: TimeoutCancellationException) {
+                throw IllegalStateException("Timed out after ${timeoutMs / 1000}s")
+            }
+        } finally {
+            waitersMutex.withLock { waiters.remove(query.id) }
         }
     }
 

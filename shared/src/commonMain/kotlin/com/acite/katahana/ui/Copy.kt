@@ -37,6 +37,7 @@ object Copy {
     const val hvh = "Human vs Human"
     const val hvai = "Human vs AI"
     const val rank = "Rank"
+    const val humanLike = "Human"
     const val fullStrength = "Full"
     const val youPlay = "You play"
     const val aiStyle = "AI"
@@ -85,6 +86,46 @@ object Copy {
     const val playVisits = "Play visits"
     const val reviewVisits = "Review visits"
     const val testConnection = "Test connection"
+    const val benchmark = "Benchmark"
+    const val benchmarkHint = "1-visit, 80, 400, and 2000-visit 19×19. About 20–90 seconds."
+    const val benchmarkOfflineHint = "Connect the engine to run a benchmark."
+    const val runBenchmark = "Run benchmark"
+    const val benchmarkRunning = "Running…"
+    const val benchmarkWarmup = "Warming up…"
+    fun benchmarkLatency(done: Int, total: Int): String = "Latency $done / $total"
+    fun benchmarkSearchVisits(visits: Int): String = "$visits visits…"
+    const val benchmarkHuman = "Human SL…"
+    const val benchmarkLatencyTitle = "Latency  ·  1-visit 19×19"
+    const val benchmarkSearchTitle = "Search  ·  19×19"
+    const val benchmarkHumanTitle = "Human SL"
+    const val median = "median"
+    const val p95 = "p95"
+    const val queriesPerSec = "queries/s"
+    const val visitsPerSecLabel = "visits/s"
+    fun playVisitsEta(visits: Int, duration: String): String =
+        "Your play visits ($visits) ≈ $duration"
+    fun searchRung(visits: Int): String = "$visits visits"
+    fun searchRungValue(duration: String, vps: String): String =
+        "$duration  ·  $vps $visitsPerSecLabel"
+    const val humanPolicyPresent = "policy present"
+    const val humanNetMissing = "Human net not loaded"
+    const val benchmarkExcellent = "Excellent — KataGo feels instant on this server."
+    const val benchmarkExcellentGear =
+        "Local high-end GPU: RX 7900 / 9070 XT, RTX 4070 Super or better."
+    const val benchmarkSmooth = "Smooth — this server can run KataGo comfortably."
+    const val benchmarkSmoothGear =
+        "Local mid GPU: RTX 3060 / 4060, RX 6600, or Apple M2 / M3."
+    const val benchmarkPlayable = "Playable — live analysis may feel a beat behind."
+    const val benchmarkPlayableGear =
+        "Entry GPU, Intel Arc, or a strong desktop CPU on a local link."
+    const val benchmarkTight =
+        "Tight — overlays will lag; drop Play visits or use a stronger GPU."
+    const val benchmarkTightGear =
+        "CPU-only laptop, or the engine is across a slow network."
+    const val benchmarkStrained =
+        "Strained — this server is too slow for comfortable KataGo play."
+    const val benchmarkStrainedGear =
+        "Below a typical laptop CPU running KataGo, or a high-latency remote."
     const val notWired = "Not wired in this phase."
     const val visitsLabel = "visits"
     const val confirmMove = "Confirm before placing"
