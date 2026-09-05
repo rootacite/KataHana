@@ -122,12 +122,81 @@ Engine offline? Human vs Human still plays. The analysis chrome just goes quiet.
 ./gradlew :desktopApp:run
 # hot reload
 ./gradlew :desktopApp:hotRun --auto
-
-# Android
-./gradlew :androidApp:assembleDebug
 ```
 
 iOS: open [`iosApp/`](./iosApp) in Xcode.
+
+### Android from the terminal
+
+The app module is `:androidApp` (`applicationId` `com.acite.katahana`). Gradle reads the SDK from `local.properties`:
+
+```
+sdk.dir=/path/to/Android/Sdk
+```
+
+`adb` is `$sdk.dir/platform-tools/adb` (or already on `PATH`). IntelliJ’s Run button is usually `installDebug`; the same thing from a shell is `./gradlew :androidApp:installDebug`.
+
+**Device.** USB debugging on, cable plugged in, RSA prompt accepted:
+
+```bash
+adb devices
+```
+
+You want `device`, not `unauthorized` or `offline`. Several devices? List serials with `adb devices -l`, then prefix every `adb` call with `-s <serial>` or export `ANDROID_SERIAL=<serial>` so Gradle picks the same one.
+
+Wireless (Android 11+ Developer options → Wireless debugging):
+
+```bash
+adb pair <ip>:<pairing-port>
+adb connect <ip>:<debug-port>
+adb devices
+```
+
+**Release onto the phone.** Gradle builds the release APK, signs it, and talks to adb for you:
+
+```bash
+./gradlew :androidApp:installRelease
+adb shell am start -n com.acite.katahana/.MainActivity
+```
+
+Same install, but you keep the APK file:
+
+```bash
+./gradlew :androidApp:assembleRelease
+adb install -r androidApp/build/outputs/apk/release/androidApp-release.apk
+```
+
+`-r` replaces an existing KataHana. If adb refuses with `INSTALL_FAILED_UPDATE_INCOMPATIBLE`, the on-device copy was signed with a different key — uninstall first:
+
+```bash
+adb uninstall com.acite.katahana
+adb install androidApp/build/outputs/apk/release/androidApp-release.apk
+```
+
+**Just the APK** (no device needed):
+
+```bash
+./gradlew :androidApp:assembleRelease
+# androidApp/build/outputs/apk/release/androidApp-release.apk
+```
+
+Play-style App Bundle, if you need one:
+
+```bash
+./gradlew :androidApp:bundleRelease
+# androidApp/build/outputs/bundle/release/androidApp-release.aab
+```
+
+Release is currently signed with the **debug** keystore (`signingConfig = signingConfigs.getByName("debug")` in `androidApp/build.gradle.kts`), minify off. That is why `installRelease` works without a store key. It is still a release variant (`debuggable=false`). A Play upload needs its own signing config later.
+
+Debug (what the IDE run configuration typically installs):
+
+```bash
+./gradlew :androidApp:installDebug
+# or
+./gradlew :androidApp:assembleDebug
+# androidApp/build/outputs/apk/debug/androidApp-debug.apk
+```
 
 ### Tests
 

@@ -2,6 +2,9 @@ package com.acite.katahana.ui.session
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -19,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import com.acite.katahana.ui.theme.HanaColors
 import com.acite.katahana.ui.theme.hanaTokens
@@ -59,7 +63,7 @@ fun HanaDrawer(
     }
     ModalNavigationDrawer(
         drawerState = drawerState,
-        gesturesEnabled = true,
+        gesturesEnabled = drawerState.isOpen,
         scrimColor = Color.Black.copy(alpha = 0.16f),
         drawerContent = {
             Box(
@@ -79,10 +83,28 @@ fun HanaDrawer(
         Box(Modifier.fillMaxSize()) {
             content()
             if (drawerState.isClosed) {
-                DrawerHandle(
-                    modifier = Modifier.align(Alignment.CenterStart),
-                    onClick = { onOpenChange(true) },
-                )
+                Box(
+                    Modifier
+                        .align(Alignment.CenterStart)
+                        .fillMaxHeight()
+                        .width(24.dp)
+                        .pointerInput(Unit) {
+                            val slop = viewConfiguration.touchSlop
+                            awaitEachGesture {
+                                val down = awaitFirstDown()
+                                val start = down.position
+                                drag(down.id) { change ->
+                                    if (change.position.x - start.x > slop) {
+                                        onOpenChange(true)
+                                        change.consume()
+                                    }
+                                }
+                            }
+                        },
+                    contentAlignment = Alignment.CenterStart,
+                ) {
+                    DrawerHandle(onClick = { onOpenChange(true) })
+                }
             }
         }
     }

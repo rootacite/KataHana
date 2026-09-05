@@ -275,6 +275,12 @@ class SessionViewModel(
         _state.update { it.copy(hover = point) }
     }
 
+    fun onAim(point: Point?) {
+        if (session.tree.ended || isAiToPlay()) return
+        if (point != null && session.position.stoneAt(point) != null) return
+        _state.update { it.copy(selected = point, hover = null) }
+    }
+
     fun onActivate(point: Point, isTouch: Boolean) {
         if (session.tree.ended || isAiToPlay()) return
         if (session.position.stoneAt(point) != null) return

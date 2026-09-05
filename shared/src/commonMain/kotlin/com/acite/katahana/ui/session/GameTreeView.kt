@@ -3,9 +3,11 @@ package com.acite.katahana.ui.session
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -15,12 +17,15 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -29,11 +34,17 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlin.math.floor
+import kotlin.math.roundToInt
 import com.acite.katahana.domain.TreeLayout
 import com.acite.katahana.domain.TreeLayoutNode
 import com.acite.katahana.ui.Copy
@@ -98,31 +109,93 @@ private fun GameTreeGraph(
     modifier: Modifier = Modifier,
 ) {
     val appearance = hanaAppearance
-    val hScroll = rememberScrollState()
-    val vScroll = rememberScrollState()
     val density = LocalDensity.current
-    LaunchedEffect(layout.currentId, layout.cols, layout.rows) {
-        val current = layout.nodes.firstOrNull { it.isCurrent } ?: return@LaunchedEffect
-        val x = with(density) { (CellW * current.col).roundToPx() }
-        val y = with(density) { (CellH * current.row).roundToPx() }
-        val hx = (x - hScroll.viewportSize / 3).coerceAtLeast(0)
-        val vy = (y - vScroll.viewportSize / 3).coerceAtLeast(0)
-        hScroll.animateScrollTo(hx)
-        vScroll.animateScrollTo(vy)
-    }
+    val goTo by rememberUpdatedState(onGoToNode)
+    val tree by rememberUpdatedState(layout)
+    var pan by remember { mutableStateOf(Offset.Zero) }
     val width = CellW * layout.cols.coerceAtLeast(1)
     val height = CellH * layout.rows.coerceAtLeast(1)
     val byId = layout.nodes.associateBy { it.id }
-    Box(
+    BoxWithConstraints(
         modifier
             .clipToBounds()
             .clip(hanaTokens.panel)
-            .background(HanaColors.bgCard)
-            .horizontalScroll(hScroll)
-            .verticalScroll(vScroll),
+            .background(HanaColors.bgCard),
     ) {
-        Box(Modifier.size(width, height).padding(2.dp)) {
-            Canvas(Modifier.fillMaxSize()) {
+        val maxX = (with(density) { width.toPx() } - constraints.maxWidth).coerceAtLeast(0f)
+        val maxY = (with(density) { height.toPx() } - constraints.maxHeight).coerceAtLeast(0f)
+        LaunchedEffect(maxX, maxY) {
+            pan = Offset(pan.x.coerceIn(0f, maxX), pan.y.coerceIn(0f, maxY))
+        }
+        LaunchedEffect(layout.currentId, layout.cols, layout.rows, maxX, maxY) {
+            val current = layout.nodes.firstOrNull { it.isCurrent } ?: return@LaunchedEffect
+            val x = with(density) { (CellW * current.col).toPx() }
+            val y = with(density) { (CellH * current.row).toPx() }
+            pan = Offset(
+                (x - constraints.maxWidth / 3f).coerceIn(0f, maxX),
+                (y - constraints.maxHeight / 3f).coerceIn(0f, maxY),
+            )
+        }
+        Box(
+            Modifier
+                .fillMaxSize()
+                .pointerInput(maxX, maxY) {
+                    val cellW = CellW.toPx()
+                    val cellH = CellH.toPx()
+                    val pad = 2.dp.toPx()
+                    val slop = viewConfiguration.touchSlop
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        down.consume()
+                        var dragged = false
+                        val start = down.position
+                        drag(down.id) { change ->
+                            if ((change.position - start).getDistance() >= slop) {
+                                dragged = true
+                            }
+                            if (dragged) {
+                                val delta = change.positionChange()
+                                val cur = pan
+                                pan = Offset(
+                                    (cur.x - delta.x).coerceIn(0f, maxX),
+                                    (cur.y - delta.y).coerceIn(0f, maxY),
+                                )
+                                change.consume()
+                            }
+                        }
+                        if (!dragged) {
+                            val origin = pan
+                            val col = floor((down.position.x + origin.x - pad) / cellW).toInt()
+                            val row = floor((down.position.y + origin.y - pad) / cellH).toInt()
+                            tree.nodes.firstOrNull { it.col == col && it.row == row }
+                                ?.let { goTo(it.id) }
+                        }
+                    }
+                }
+                .pointerInput(maxX, maxY) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            if (event.type != PointerEventType.Scroll) continue
+                            val change = event.changes.firstOrNull() ?: continue
+                            val scroll = change.scrollDelta
+                            val cur = pan
+                            pan = Offset(
+                                (cur.x + scroll.x).coerceIn(0f, maxX),
+                                (cur.y + scroll.y).coerceIn(0f, maxY),
+                            )
+                            change.consume()
+                        }
+                    }
+                },
+        ) {
+            Box(
+                Modifier
+                    .offset { IntOffset(-pan.x.roundToInt(), -pan.y.roundToInt()) }
+                    .size(width, height)
+                    .padding(2.dp),
+            ) {
+                Canvas(Modifier.fillMaxSize()) {
                 val cellW = CellW.toPx()
                 val cellH = CellH.toPx()
                 fun center(node: TreeLayoutNode): Offset {
@@ -154,18 +227,18 @@ private fun GameTreeGraph(
                     }
                 }
             }
-            for (node in layout.nodes) {
-                TreeNodeChip(
-                    node = node,
-                    fill = node.color?.let { appearance.swatch(it).fill } ?: Color.Transparent,
-                    rim = when {
-                        node.isCurrent -> HanaColors.accentPink
-                        node.color != null -> appearance.swatch(node.color).rim
-                        else -> HanaColors.accentLilac
-                    },
-                    onClick = { onGoToNode(node.id) },
-                    modifier = Modifier.offset(x = CellW * node.col, y = CellH * node.row),
-                )
+                for (node in layout.nodes) {
+                    TreeNodeChip(
+                        node = node,
+                        fill = node.color?.let { appearance.swatch(it).fill } ?: Color.Transparent,
+                        rim = when {
+                            node.isCurrent -> HanaColors.accentPink
+                            node.color != null -> appearance.swatch(node.color).rim
+                            else -> HanaColors.accentLilac
+                        },
+                        modifier = Modifier.offset(x = CellW * node.col, y = CellH * node.row),
+                    )
+                }
             }
         }
     }
@@ -176,7 +249,6 @@ private fun TreeNodeChip(
     node: TreeLayoutNode,
     fill: Color,
     rim: Color,
-    onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val alpha = if (node.isFuture) 0.42f else 1f
@@ -184,8 +256,7 @@ private fun TreeNodeChip(
     Column(
         modifier
             .size(CellW, CellH)
-            .alpha(alpha)
-            .clickable(onClick = onClick),
+            .alpha(alpha),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box(

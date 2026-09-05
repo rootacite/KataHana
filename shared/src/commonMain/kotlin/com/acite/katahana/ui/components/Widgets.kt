@@ -27,6 +27,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.acite.katahana.ui.theme.HanaColors
@@ -43,6 +44,38 @@ fun CapsuleButton(
     compact: Boolean = false,
 ) {
     val tokens = hanaTokens
+    if (compact) {
+        val bg = when {
+            !enabled -> HanaColors.bgCard.copy(alpha = 0.5f)
+            emphasized -> HanaColors.accentPink
+            else -> HanaColors.bgCard
+        }
+        val fg = when {
+            !enabled -> HanaColors.textDim
+            emphasized -> Color.White
+            else -> HanaColors.text
+        }
+        Box(
+            modifier
+                .height(36.dp)
+                .clip(tokens.capsule)
+                .background(bg)
+                .clickable(enabled = enabled, onClick = onClick)
+                .padding(horizontal = 6.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text,
+                color = fg,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 12.sp,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        return
+    }
     Button(
         onClick = onClick,
         enabled = enabled,
@@ -53,14 +86,16 @@ fun CapsuleButton(
             disabledContainerColor = HanaColors.bgCard.copy(alpha = 0.5f),
             disabledContentColor = HanaColors.textDim,
         ),
-        contentPadding = if (compact) {
-            androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 4.dp)
-        } else {
-            ButtonDefaults.ContentPadding
-        },
-        modifier = modifier.height(if (compact) 36.dp else 52.dp),
+        contentPadding = ButtonDefaults.ContentPadding,
+        modifier = modifier.height(52.dp),
     ) {
-        Text(text, fontWeight = FontWeight.SemiBold, fontSize = if (compact) 13.sp else 14.sp)
+        Text(
+            text,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 14.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 

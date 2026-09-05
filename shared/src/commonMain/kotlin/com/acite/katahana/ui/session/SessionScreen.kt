@@ -229,6 +229,7 @@ private fun SessionRoute(vm: SessionViewModel) {
                             preview = ui.preview,
                             onHover = vm::onHover,
                             onActivate = vm::onActivate,
+                            onAim = vm::onAim,
                             modifier = Modifier.size(boardSide),
                             candidates = boardCandidates,
                             qualities = boardQualities,

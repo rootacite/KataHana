@@ -118,7 +118,6 @@ fun SidePanel(
             onUndo = onUndo,
             onRedo = onRedo,
             onConfirm = onConfirm,
-            compact = true,
         )
         if (snapshot.variationCount > 1) {
             VariationRow(snapshot.variationIndex, snapshot.variationCount, onCycleVariation)

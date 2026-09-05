@@ -27,7 +27,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.acite.katahana.domain.SessionSnapshot
 import com.acite.katahana.ui.Copy
-import com.acite.katahana.ui.components.CapsuleButton
 import com.acite.katahana.ui.theme.HanaColors
 
 @Composable
@@ -40,42 +39,17 @@ fun PlayActionsBar(
     onRedo: () -> Unit,
     onConfirm: () -> Unit,
     modifier: Modifier = Modifier,
-    compact: Boolean = false,
 ) {
     Row(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(if (compact) 6.dp else 8.dp),
+        horizontalArrangement = Arrangement.SpaceEvenly,
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        CapsuleButton(
-            Copy.pass,
-            onPass,
-            modifier = Modifier.weight(1f),
-            enabled = humanTurn,
-            compact = compact,
-        )
-        CapsuleButton(
-            Copy.undo,
-            onUndo,
-            modifier = Modifier.weight(1f),
-            enabled = snapshot.canUndo,
-            compact = compact,
-        )
-        CapsuleButton(
-            Copy.redo,
-            onRedo,
-            modifier = Modifier.weight(1f),
-            enabled = snapshot.canRedo,
-            compact = compact,
-        )
+        PlayGlyphButton(PlayGlyph.Pass, Copy.pass, humanTurn, onPass)
+        PlayGlyphButton(PlayGlyph.Undo, Copy.undo, snapshot.canUndo, onUndo)
+        PlayGlyphButton(PlayGlyph.Redo, Copy.redo, snapshot.canRedo, onRedo)
         if (hasSelection) {
-            CapsuleButton(
-                Copy.confirm,
-                onConfirm,
-                modifier = Modifier.weight(1f),
-                emphasized = true,
-                enabled = humanTurn,
-                compact = compact,
-            )
+            PlayGlyphButton(PlayGlyph.Confirm, Copy.confirm, humanTurn, onConfirm, emphasized = true)
         }
     }
 }
