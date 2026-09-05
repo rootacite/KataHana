@@ -8,6 +8,9 @@ import com.acite.katahana.ai.RankBot
 import com.acite.katahana.ai.bandForLoss
 import com.acite.katahana.ai.recentQualities
 import com.acite.katahana.domain.AiStyle
+import com.acite.katahana.domain.EvalGraphMode
+import com.acite.katahana.domain.EvalSample
+import com.acite.katahana.domain.EvalView
 import com.acite.katahana.domain.GameConfig
 import com.acite.katahana.domain.GameSession
 import com.acite.katahana.domain.GameTree
@@ -16,10 +19,14 @@ import com.acite.katahana.domain.Move
 import com.acite.katahana.domain.PlayMode
 import com.acite.katahana.domain.PlayResult
 import com.acite.katahana.domain.Point
+import com.acite.katahana.domain.QualityStats
 import com.acite.katahana.domain.SessionSnapshot
 import com.acite.katahana.domain.StoneColor
 import com.acite.katahana.domain.TreeLayout
 import com.acite.katahana.domain.layout
+import com.acite.katahana.domain.nodeById
+import com.acite.katahana.domain.qualityCounts
+import com.acite.katahana.domain.samplesFrom
 import com.acite.katahana.engine.AnalysisClient
 import com.acite.katahana.engine.Candidate
 import com.acite.katahana.engine.EnginePhase
@@ -34,6 +41,7 @@ import com.acite.katahana.engine.heldOwnership
 import com.acite.katahana.engine.selectCandidates
 import com.acite.katahana.engine.toBlackView
 import com.acite.katahana.epochMillis
+import com.acite.katahana.recents.PersistedEval
 import com.acite.katahana.recents.RecentGame
 import com.acite.katahana.recents.RecentGamesRepository
 import com.acite.katahana.recents.defaultRecentTitle
@@ -75,6 +83,9 @@ data class SessionUiState(
     val aiThinking: Boolean = false,
     val aiError: String? = null,
     val qualities: List<QualityMark> = emptyList(),
+    val evalSamples: List<EvalSample> = emptyList(),
+    val qualityStats: QualityStats = QualityStats(),
+    val evalGraphMode: EvalGraphMode = EvalGraphMode.Score,
     val tree: TreeLayout = TreeLayout(emptyList(), "", 0, 0),
     val ownership: List<Double> = emptyList(),
     val deadPoints: Set<Point> = emptySet(),
@@ -106,7 +117,11 @@ private data class StoredEval(
     val moveInfos: List<MoveInfo>,
     val toPlay: StoneColor,
     val ownership: List<Double> = emptyList(),
-)
+    val pointsLost: Double? = null,
+    val hasView: Boolean = true,
+) {
+    fun toView(): EvalView = EvalView(blackWinrate, blackScoreLead, hasView)
+}
 
 @AssistedInject
 class SessionViewModel(
@@ -227,8 +242,13 @@ class SessionViewModel(
             val existing = recents.games.value.find { it.id == boundId }
             boundCreatedAt = existing?.createdAt
             if (existing != null && boundTitle.isBlank()) boundTitle = existing.title
+            existing?.evals?.let(::restoreEvals)
         }
         refreshSaveFlags()
+        _state.update { it.withAnalysis() }
+        viewModelScope.launch {
+            quality.collect { _state.update { state -> state.withAnalysis() } }
+        }
         viewModelScope.launch {
             analysis.status.collect { status ->
                 val becameOnline = status.online && !_state.value.engineStatus.online
@@ -244,7 +264,7 @@ class SessionViewModel(
                 if (live.sessionId != sessionId) return@collect
                 rememberLive(live)
                 if (live.nodeId != session.tree.current.id) {
-                    _state.update { it.copy(qualities = refreshQualities()) }
+                    _state.update { it.withAnalysis() }
                     return@collect
                 }
                 _state.update {
@@ -254,7 +274,6 @@ class SessionViewModel(
                         visits = live.visits,
                         candidates = live.candidates,
                         analyzing = live.isDuringSearch,
-                        qualities = refreshQualities(),
                         ownership = heldOwnership(
                             it.ownership,
                             live.ownership,
@@ -266,11 +285,16 @@ class SessionViewModel(
                             live.visits,
                             it.deadPoints,
                         ),
-                    )
+                    ).withAnalysis()
                 }
             }
         }
         afterPositionChange()
+    }
+
+    fun setEvalGraphMode(mode: EvalGraphMode) {
+        if (_state.value.evalGraphMode == mode) return
+        _state.update { it.copy(evalGraphMode = mode) }
     }
 
     fun onHover(point: Point?) {
@@ -371,6 +395,7 @@ class SessionViewModel(
             aiStyle = config.toRecentAiStyle(),
             sgf = sgfText(),
             currentPath = session.tree.childPath(),
+            evals = dumpEvals(),
         )
         return runCatching {
             recents.upsert(game)
@@ -433,11 +458,10 @@ class SessionViewModel(
                 ),
                 aiThinking = false,
                 aiError = null,
-                qualities = refreshQualities(),
                 tree = session.tree.layout(),
                 dirty = computeDirty(),
                 canSave = boundId != null || hasContent(),
-            )
+            ).withAnalysis()
         }
         afterPositionChange()
     }
@@ -469,13 +493,13 @@ class SessionViewModel(
                     AiStyle.Rank -> {
                         val response = analysis.queryRank(sessionId, session.tree)
                         storeEval(nodeId, response, toPlay)
-                        _state.update { it.copy(qualities = refreshQualities()) }
+                        _state.update { it.withAnalysis() }
                         RankBot.choose(response.policy, session.position, config.rankKyu, Random.Default).move
                     }
                     AiStyle.Full -> {
                         val response = analysis.queryGenmove(sessionId, session.tree)
                         storeEval(nodeId, response, toPlay)
-                        _state.update { it.copy(qualities = refreshQualities()) }
+                        _state.update { it.withAnalysis() }
                         FullStrengthBot.choose(response.moveInfos, session.tree.size, toPlay)
                     }
                 }
@@ -536,13 +560,64 @@ class SessionViewModel(
     }
 
     private fun rememberEval(nodeId: String, eval: StoredEval) {
-        val prev = nodeEvals[nodeId] ?: run {
-            nodeEvals[nodeId] = eval
-            return
+        val prev = nodeEvals[nodeId]
+        val keep = when {
+            prev == null -> true
+            prev.visits > eval.visits -> false
+            prev.visits == eval.visits && prev.ownership.isNotEmpty() && eval.ownership.isEmpty() -> false
+            else -> true
         }
-        if (prev.visits > eval.visits) return
-        if (prev.visits == eval.visits && prev.ownership.isNotEmpty() && eval.ownership.isEmpty()) return
-        nodeEvals[nodeId] = eval
+        if (!keep) return
+        val node = session.tree.nodeById(nodeId)
+        val loss = node?.let { lossInto(it, eval) } ?: eval.pointsLost ?: prev?.pointsLost
+        nodeEvals[nodeId] = eval.copy(pointsLost = loss, hasView = true)
+        if (node != null) refreshChildLosses(node)
+    }
+
+    private fun lossInto(node: Node, eval: StoredEval): Double? {
+        val parent = node.parent ?: return eval.pointsLost
+        val parentEval = nodeEvals[parent.id] ?: return eval.pointsLost
+        val place = node.move as? Move.Place
+        val gtp = place?.point?.toGtp(session.tree.size)
+        val info = gtp?.let { key -> parentEval.moveInfos.find { it.move.equals(key, ignoreCase = true) } }
+        return when {
+            info != null -> {
+                val bestLead = parentEval.moveInfos.minByOrNull { it.order }?.scoreLead
+                    ?: parentEval.blackScoreLead
+                pointsLost(bestLead, info.scoreLead, parentEval.toPlay)
+            }
+            eval.hasView && parentEval.hasView ->
+                pointsLost(parentEval.blackScoreLead, eval.blackScoreLead, parentEval.toPlay)
+            else -> eval.pointsLost
+        }
+    }
+
+    private fun refreshChildLosses(parent: Node) {
+        val parentEval = nodeEvals[parent.id] ?: return
+        if (parentEval.moveInfos.isEmpty()) return
+        val size = session.tree.size
+        val bestLead = parentEval.moveInfos.minByOrNull { it.order }?.scoreLead
+            ?: parentEval.blackScoreLead
+        for (child in parent.children) {
+            val place = child.move as? Move.Place ?: continue
+            val gtp = place.point.toGtp(size)
+            val info = parentEval.moveInfos.find { it.move.equals(gtp, ignoreCase = true) } ?: continue
+            val loss = pointsLost(bestLead, info.scoreLead, parentEval.toPlay)
+            val existing = nodeEvals[child.id]
+            if (existing != null) {
+                nodeEvals[child.id] = existing.copy(pointsLost = loss)
+            } else {
+                nodeEvals[child.id] = StoredEval(
+                    blackWinrate = 0.0,
+                    blackScoreLead = 0.0,
+                    visits = 0,
+                    moveInfos = emptyList(),
+                    toPlay = child.position.toPlay,
+                    pointsLost = loss,
+                    hasView = false,
+                )
+            }
+        }
     }
 
     private fun storeEval(nodeId: String, response: AnalysisResponse, toPlay: StoneColor) {
@@ -586,7 +661,6 @@ class SessionViewModel(
                     _state.update { state ->
                         state.copy(
                             reviewProgress = ReviewProgress(index + 1, pending.size, true),
-                            qualities = refreshQualities(),
                             blackWinrate = if (isCurrent) eval?.blackWinrate else state.blackWinrate,
                             blackScoreLead = if (isCurrent) eval?.blackScoreLead else state.blackScoreLead,
                             visits = if (isCurrent) eval?.visits ?: state.visits else state.visits,
@@ -610,7 +684,7 @@ class SessionViewModel(
                             } else {
                                 state.deadPoints
                             },
-                        )
+                        ).withAnalysis()
                     }
                 }
             } catch (e: CancellationException) {
@@ -667,28 +741,41 @@ class SessionViewModel(
         return next
     }
 
-    private fun refreshQualities(): List<QualityMark> {
+    private fun SessionUiState.withAnalysis(): SessionUiState {
+        val boardMarks = collectQualities(session.tree.nodesFromRoot())
+        val lineMarks = collectQualities(session.tree.preferredLine())
+        return copy(
+            qualities = recentQualities(boardMarks),
+            evalSamples = samplesFrom(session.tree.preferredLine()) { id -> nodeEvals[id]?.toView() },
+            qualityStats = qualityCounts(lineMarks),
+        )
+    }
+
+    private fun collectQualities(line: List<Node>): List<QualityMark> {
         val thresholds = quality.value
         val marks = ArrayList<QualityMark>()
-        val line = session.tree.nodesFromRoot()
         val size = session.tree.size
         for (i in 1 until line.size) {
             val parent = line[i - 1]
             val node = line[i]
             val place = node.move as? Move.Place ?: continue
-            val eval = nodeEvals[parent.id] ?: continue
-            val gtp = place.point.toGtp(size)
-            val info = eval.moveInfos.find { it.move.equals(gtp, ignoreCase = true) }
+            val eval = nodeEvals[parent.id]
             val childEval = nodeEvals[node.id]
-            val loss = if (info != null) {
-                val bestLead = eval.moveInfos.minByOrNull { it.order }?.scoreLead ?: eval.blackScoreLead
-                pointsLost(bestLead, info.scoreLead, eval.toPlay)
-            } else if (childEval != null) {
-                pointsLost(eval.blackScoreLead, childEval.blackScoreLead, eval.toPlay)
-            } else {
-                continue
+            val gtp = place.point.toGtp(size)
+            val info = eval?.moveInfos?.find { it.move.equals(gtp, ignoreCase = true) }
+            val persisted = childEval?.pointsLost
+            val loss = when {
+                eval != null && info != null -> {
+                    val bestLead = eval.moveInfos.minByOrNull { it.order }?.scoreLead
+                        ?: eval.blackScoreLead
+                    pointsLost(bestLead, info.scoreLead, eval.toPlay)
+                }
+                persisted != null -> persisted
+                eval != null && childEval != null && eval.hasView && childEval.hasView ->
+                    pointsLost(eval.blackScoreLead, childEval.blackScoreLead, eval.toPlay)
+                else -> continue
             }
-            val visits = info?.visits?.takeIf { it > 0 } ?: childEval?.visits ?: eval.visits
+            val visits = info?.visits?.takeIf { it > 0 } ?: childEval?.visits ?: eval?.visits ?: 0
             marks += QualityMark(
                 point = place.point,
                 pointsLost = loss,
@@ -697,7 +784,54 @@ class SessionViewModel(
                 color = place.color,
             )
         }
-        return recentQualities(marks)
+        return marks
+    }
+
+    private fun restoreEvals(records: List<PersistedEval>) {
+        for (rec in records) {
+            val node = session.tree.nodeAtPath(rec.path) ?: continue
+            val toPlay = if (rec.toPlay.equals("W", ignoreCase = true)) {
+                StoneColor.White
+            } else {
+                StoneColor.Black
+            }
+            val hasView = rec.blackWinrate != null && rec.blackScoreLead != null
+            nodeEvals[node.id] = StoredEval(
+                blackWinrate = rec.blackWinrate ?: 0.0,
+                blackScoreLead = rec.blackScoreLead ?: 0.0,
+                visits = rec.visits,
+                moveInfos = emptyList(),
+                toPlay = toPlay,
+                pointsLost = rec.pointsLost,
+                hasView = hasView,
+            )
+        }
+    }
+
+    private fun dumpEvals(): List<PersistedEval> {
+        val out = ArrayList<PersistedEval>()
+        fun walk(node: Node) {
+            val eval = nodeEvals[node.id]
+            if (eval != null) {
+                out += PersistedEval(
+                    path = node.pathFromRoot(),
+                    blackWinrate = eval.blackWinrate.takeIf { eval.hasView },
+                    blackScoreLead = eval.blackScoreLead.takeIf { eval.hasView },
+                    visits = eval.visits,
+                    toPlay = if (eval.toPlay == StoneColor.Black) "B" else "W",
+                    pointsLost = eval.pointsLost,
+                )
+            }
+            node.children.forEach(::walk)
+        }
+        walk(session.tree.root)
+        return out
+    }
+
+    private fun flushBoundEvals() {
+        val id = boundId ?: return
+        val existing = recents.games.value.find { it.id == id } ?: return
+        recents.upsertSync(existing.copy(evals = dumpEvals()))
     }
 
     fun leave() {
@@ -705,6 +839,7 @@ class SessionViewModel(
         aiJob?.cancel()
         cancelReviewQueue()
         analysis.cancelLive(sessionId)
+        flushBoundEvals()
     }
 
     override fun onCleared() {

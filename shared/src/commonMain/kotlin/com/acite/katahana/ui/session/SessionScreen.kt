@@ -199,6 +199,10 @@ private fun SessionRoute(vm: SessionViewModel) {
                         onCycleVariation = vm::cycleVariation,
                         onGoToNode = vm::goToNode,
                         tree = ui.tree,
+                        evalSamples = ui.evalSamples,
+                        evalGraphMode = ui.evalGraphMode,
+                        onEvalGraphMode = vm::setEvalGraphMode,
+                        qualityStats = ui.qualityStats,
                         dirty = ui.dirty,
                         canSave = ui.canSave,
                         onSave = { performSave(false) },
@@ -262,11 +266,15 @@ private fun SessionRoute(vm: SessionViewModel) {
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             if (treeW > 0.dp) {
-                                GameTreeCard(
+                                SessionTreeColumn(
                                     layout = ui.tree,
                                     reviewing = snapshot.reviewing,
                                     onGoToNode = vm::goToNode,
-                                    compact = true,
+                                    samples = ui.evalSamples,
+                                    currentMoveNumber = snapshot.moveNumber,
+                                    graphMode = ui.evalGraphMode,
+                                    onGraphMode = vm::setEvalGraphMode,
+                                    stats = ui.qualityStats,
                                     modifier = Modifier
                                         .width(treeW)
                                         .fillMaxHeight(),

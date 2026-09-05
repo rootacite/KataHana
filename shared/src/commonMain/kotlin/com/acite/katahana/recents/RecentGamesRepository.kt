@@ -36,6 +36,11 @@ class RecentGamesRepository internal constructor(
         }
     }
 
+    /** Last-chance write from [leave]; skips the mutex so the VM can flush on the way out. */
+    fun upsertSync(game: RecentGame) {
+        persist(RecentGamesIndex.upsert(_games.value, game))
+    }
+
     suspend fun remove(id: String) {
         mutex.withLock {
             persist(RecentGamesIndex.remove(_games.value, id))

@@ -149,5 +149,8 @@ class GameTreeTest {
         assertTrue(tree.applyChildPath(path))
         assertEquals(Point(5, 5), (tree.current.move as Move.Place).point)
         assertEquals(Point(4, 4), (tree.current.parent?.move as Move.Place).point)
+        assertEquals(path, tree.current.pathFromRoot())
+        val found = tree.nodeAtPath(path)
+        assertEquals(tree.current.id, found?.id)
     }
 }

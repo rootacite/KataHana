@@ -47,6 +47,27 @@ class RecentGamesIndexTest {
     }
 
     @Test
+    fun encodeDecodeKeepsEvals() {
+        val evals = listOf(
+            PersistedEval(
+                path = listOf(0),
+                blackWinrate = 0.61,
+                blackScoreLead = 3.5,
+                visits = 400,
+                toPlay = "W",
+                pointsLost = 0.4,
+            ),
+            PersistedEval(
+                path = listOf(0, 1),
+                pointsLost = 12.0,
+            ),
+        )
+        val list = listOf(sample("a", "Alpha", path = listOf(0, 1)).copy(evals = evals))
+        val decoded = RecentGamesIndex.decode(RecentGamesIndex.encode(list))
+        assertEquals(evals, decoded.single().evals)
+    }
+
+    @Test
     fun defaultTitleAndConfig() {
         val hvh = GameConfig(boardSize = 13, mode = PlayMode.HumanVsHuman)
         assertEquals("13×13 · Human vs Human", defaultRecentTitle(hvh))

@@ -21,6 +21,7 @@ data class RecentGame(
     val aiStyle: String = "rank",
     val sgf: String,
     val currentPath: List<Int> = emptyList(),
+    val evals: List<PersistedEval> = emptyList(),
 ) {
     fun toConfig(): GameConfig = GameConfig(
         boardSize = if (boardSize == 9 || boardSize == 13 || boardSize == 19) boardSize else 19,
@@ -40,6 +41,16 @@ data class RecentGame(
         return "${boardSize}×${boardSize}  ·  Move $moveNumber  ·  $match"
     }
 }
+
+@Serializable
+data class PersistedEval(
+    val path: List<Int>,
+    val blackWinrate: Double? = null,
+    val blackScoreLead: Double? = null,
+    val visits: Int = 0,
+    val toPlay: String = "B",
+    val pointsLost: Double? = null,
+)
 
 fun GameConfig.toRecentMode(): String =
     if (mode == PlayMode.HumanVsAi) "hvai" else "hvh"

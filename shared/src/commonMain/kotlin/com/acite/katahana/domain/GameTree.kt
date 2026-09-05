@@ -10,6 +10,20 @@ class Node(
     var preferredChild: Int = 0
 
     val moveNumber: Int = generateSequence(this) { it.parent }.count { it.move != null }
+
+    /** Child indices from the tree root down to this node. */
+    fun pathFromRoot(): List<Int> {
+        val acc = ArrayDeque<Int>()
+        var node = this
+        while (true) {
+            val parent = node.parent ?: break
+            val idx = parent.children.indexOf(node)
+            if (idx < 0) break
+            acc.addFirst(idx)
+            node = parent
+        }
+        return acc.toList()
+    }
 }
 
 class GameTree(
@@ -142,17 +156,14 @@ class GameTree(
     }
 
     /** Child indices from root to [current], used to restore the viewing node. */
-    fun childPath(): List<Int> {
-        val acc = ArrayDeque<Int>()
-        var node = current
-        while (true) {
-            val parent = node.parent ?: break
-            val idx = parent.children.indexOf(node)
-            if (idx < 0) break
-            acc.addFirst(idx)
-            node = parent
+    fun childPath(): List<Int> = current.pathFromRoot()
+
+    fun nodeAtPath(path: List<Int>): Node? {
+        var node = root
+        for (index in path) {
+            node = node.children.getOrNull(index) ?: return null
         }
-        return acc.toList()
+        return node
     }
 
     fun applyChildPath(path: List<Int>): Boolean {

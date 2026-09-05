@@ -26,7 +26,10 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.acite.katahana.domain.AiStyle
+import com.acite.katahana.domain.EvalGraphMode
+import com.acite.katahana.domain.EvalSample
 import com.acite.katahana.domain.PlayMode
+import com.acite.katahana.domain.QualityStats
 import com.acite.katahana.domain.SessionSnapshot
 import com.acite.katahana.domain.StoneColor
 import com.acite.katahana.domain.TreeLayout
@@ -62,6 +65,10 @@ fun SidePanel(
     onCycleVariation: (Int) -> Unit = {},
     onGoToNode: (String) -> Unit = {},
     tree: TreeLayout? = null,
+    evalSamples: List<EvalSample> = emptyList(),
+    evalGraphMode: EvalGraphMode = EvalGraphMode.Score,
+    onEvalGraphMode: (EvalGraphMode) -> Unit = {},
+    qualityStats: QualityStats = QualityStats(),
     dirty: Boolean = false,
     canSave: Boolean = false,
     onSave: () -> Unit = {},
@@ -127,6 +134,20 @@ fun SidePanel(
                 layout = tree,
                 reviewing = snapshot.reviewing,
                 onGoToNode = onGoToNode,
+                compact = false,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            EvalGraphCard(
+                samples = evalSamples,
+                currentMoveNumber = snapshot.moveNumber,
+                mode = evalGraphMode,
+                onMode = onEvalGraphMode,
+                onSeek = onGoToNode,
+                compact = false,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            QualityStatsCard(
+                stats = qualityStats,
                 compact = false,
                 modifier = Modifier.fillMaxWidth(),
             )
