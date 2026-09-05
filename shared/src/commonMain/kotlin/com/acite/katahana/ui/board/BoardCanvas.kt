@@ -366,15 +366,6 @@ fun BoardCanvas(
             }
         }
         val stoneR = layout.gap * 0.46f
-        for (y in 0 until boardSize) {
-            for (x in 0 until boardSize) {
-                val color = snapshot.stoneAt(x, y) ?: continue
-                val p = Point(x, y)
-                val squashY = if (p == snapshot.lastMove) squash.value else 1f
-                val alpha = if (p in deadPoints) 0.40f else 1f
-                drawStone(color, appearance, layout.center(p), stoneR, squashY = squashY, alpha = alpha)
-            }
-        }
         if (showConnections) {
             drawStoneLinks(
                 links = stoneLinks(snapshot),
@@ -384,6 +375,15 @@ fun BoardCanvas(
                 growFrom = snapshot.lastMove,
                 progress = linkGrow.value,
             )
+        }
+        for (y in 0 until boardSize) {
+            for (x in 0 until boardSize) {
+                val color = snapshot.stoneAt(x, y) ?: continue
+                val p = Point(x, y)
+                val squashY = if (p == snapshot.lastMove) squash.value else 1f
+                val alpha = if (p in deadPoints) 0.40f else 1f
+                drawStone(color, appearance, layout.center(p), stoneR, squashY = squashY, alpha = alpha)
+            }
         }
         for (mark in qualities) {
             if (mark.point in deadPoints) continue
