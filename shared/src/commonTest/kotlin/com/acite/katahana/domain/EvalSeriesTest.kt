@@ -56,6 +56,16 @@ class EvalSeriesTest {
     }
 
     @Test
+    fun advantageTintFollowsCurrentYAxis() {
+        assertEquals(1f, advantageTint(10.0, 10.0))
+        assertEquals(0f, advantageTint(-10.0, 10.0))
+        assertEquals(0.5f, advantageTint(0.0, 10.0))
+        assertEquals(0.6f, advantageTint(2.0, 10.0), 1e-5f)
+        assertEquals(1f, advantageTint(5.0, 5.0))
+        assertEquals(0.7f, advantageTint(2.0, 5.0), 1e-5f)
+    }
+
+    @Test
     fun qualityCountsSplitByColorAndSkipShallow() {
         val marks = listOf(
             mark(QualityBand.Good, StoneColor.Black),

@@ -72,6 +72,15 @@ fun yMaxFor(samples: List<EvalSample>, mode: EvalGraphMode): Double {
     return niceAbs(peak, floor)
 }
 
+/**
+ * Color stop along the current Y axis: 0 = White stone (bottom / −yMax),
+ * 1 = Black stone (top / +yMax). Rescales whenever [yMax] changes.
+ */
+fun advantageTint(adv: Double, yMax: Double): Float {
+    val span = if (yMax > 1e-9) yMax else 1.0
+    return ((adv / span) * 0.5 + 0.5).toFloat().coerceIn(0f, 1f)
+}
+
 val STAT_BANDS: List<QualityBand> = listOf(
     QualityBand.Good,
     QualityBand.Fair,

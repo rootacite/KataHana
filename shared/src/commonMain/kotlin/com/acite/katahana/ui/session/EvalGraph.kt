@@ -20,10 +20,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.pointerInput
@@ -38,6 +38,7 @@ import com.acite.katahana.domain.EvalSample
 import com.acite.katahana.domain.QualityStats
 import com.acite.katahana.domain.TreeLayout
 import com.acite.katahana.domain.advantage
+import com.acite.katahana.domain.advantageTint
 import com.acite.katahana.domain.yMaxFor
 import com.acite.katahana.ui.Copy
 import com.acite.katahana.ui.theme.HanaColors
@@ -45,6 +46,8 @@ import com.acite.katahana.ui.theme.StoneSwatch
 import com.acite.katahana.ui.theme.hanaAppearance
 import com.acite.katahana.ui.theme.hanaTokens
 import kotlin.math.abs
+import kotlin.math.ceil
+import kotlin.math.hypot
 import kotlin.math.roundToInt
 
 private val PlotHeight = 128.dp
@@ -205,10 +208,7 @@ private fun EvalPlot(
             val t = (adv / yMax).toFloat().coerceIn(-1f, 1f)
             return zeroY - t * (plotH / 2f)
         }
-        fun tint(adv: Double): Color {
-            val t = ((adv / yMax) * 0.5 + 0.5).toFloat().coerceIn(0f, 1f)
-            return lerp(whiteInk, blackInk, t)
-        }
+        fun tint(adv: Double): Color = lerp(whiteInk, blackInk, advantageTint(adv, yMax))
 
         drawLine(
             color = HanaColors.accentLilac.copy(alpha = 0.45f),
@@ -225,6 +225,8 @@ private fun EvalPlot(
         )
 
         if (samples.size >= 2) {
+            val stroke = 2.2.dp.toPx()
+            val stepPx = 2.dp.toPx()
             for (i in 0 until samples.lastIndex) {
                 val a = samples[i]
                 val b = samples[i + 1]
@@ -232,22 +234,17 @@ private fun EvalPlot(
                 val yb = b.advantage(mode)
                 val p0 = Offset(xOf(a.moveNumber), yOf(ya))
                 val p1 = Offset(xOf(b.moveNumber), yOf(yb))
-                val c0 = tint(ya)
-                val c1 = tint(yb)
-                val fill = Path().apply {
-                    moveTo(p0.x, zeroY)
-                    lineTo(p0.x, p0.y)
-                    lineTo(p1.x, p1.y)
-                    lineTo(p1.x, zeroY)
-                    close()
-                }
-                drawPath(fill, c0.copy(alpha = 0.16f))
-                drawLine(
-                    brush = Brush.linearGradient(listOf(c0, c1), p0, p1),
-                    start = p0,
-                    end = p1,
-                    strokeWidth = 2.2.dp.toPx(),
-                    cap = StrokeCap.Round,
+                drawAdvantageSegment(
+                    p0 = p0,
+                    p1 = p1,
+                    adv0 = ya,
+                    adv1 = yb,
+                    yMax = yMax,
+                    zeroY = zeroY,
+                    blackInk = blackInk,
+                    whiteInk = whiteInk,
+                    stroke = stroke,
+                    stepPx = stepPx,
                 )
             }
         } else if (samples.size == 1) {
@@ -295,8 +292,48 @@ private fun EvalPlot(
     }
 }
 
-private fun curveInk(swatch: StoneSwatch): Color =
-    if (swatch.light) swatch.fill else swatch.hi
+private fun DrawScope.drawAdvantageSegment(
+    p0: Offset,
+    p1: Offset,
+    adv0: Double,
+    adv1: Double,
+    yMax: Double,
+    zeroY: Float,
+    blackInk: Color,
+    whiteInk: Color,
+    stroke: Float,
+    stepPx: Float,
+) {
+    val dist = hypot((p1.x - p0.x).toDouble(), (p1.y - p0.y).toDouble()).toFloat()
+    val steps = maxOf(1, ceil(dist / stepPx.coerceAtLeast(1f)).toInt())
+    var prev = p0
+    for (s in 1..steps) {
+        val u = s / steps.toFloat()
+        val cur = Offset(p0.x + (p1.x - p0.x) * u, p0.y + (p1.y - p0.y) * u)
+        val adv = adv0 + (adv1 - adv0) * u
+        val color = lerp(whiteInk, blackInk, advantageTint(adv, yMax))
+        val fill = Path().apply {
+            moveTo(prev.x, zeroY)
+            lineTo(prev.x, prev.y)
+            lineTo(cur.x, cur.y)
+            lineTo(cur.x, zeroY)
+            close()
+        }
+        drawPath(fill, color.copy(alpha = 0.18f))
+        drawLine(color, prev, cur, strokeWidth = stroke, cap = StrokeCap.Round)
+        prev = cur
+    }
+}
+
+private fun curveInk(swatch: StoneSwatch): Color {
+    val fill = swatch.fill
+    val contrast = abs(luminance(fill) - luminance(HanaColors.bgCard))
+    if (contrast >= 0.18f) return fill
+    return if (swatch.light) swatch.rim else lerp(fill, swatch.hi, 0.65f)
+}
+
+private fun luminance(c: Color): Float =
+    0.2126f * c.red + 0.7152f * c.green + 0.0722f * c.blue
 
 private fun formatAxis(value: Double, mode: EvalGraphMode): String {
     if (abs(value) < 0.05) return if (mode == EvalGraphMode.Winrate) "0%" else "0"
