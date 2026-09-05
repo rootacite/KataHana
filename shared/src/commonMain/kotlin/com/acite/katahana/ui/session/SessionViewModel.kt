@@ -133,7 +133,10 @@ class SessionViewModel(
     private val analysis: AnalysisClient,
     private val recents: RecentGamesRepository,
 ) : ViewModel() {
-    private val session = GameSession(config, loadedTree)
+    private val session = GameSession(
+        config,
+        loadedTree ?: recentId?.let { recents.open(it)?.tree },
+    )
     private val sessionId = Random.nextLong().toULong().toString(16)
     private val nodeEvals = mutableMapOf<String, StoredEval>()
     private var aiJob: Job? = null

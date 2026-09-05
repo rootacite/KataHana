@@ -1,5 +1,7 @@
 package com.acite.katahana.domain
 
+import cafe.adriel.voyager.core.lifecycle.JavaSerializable
+
 enum class PlayMode {
     HumanVsHuman,
     HumanVsAi,
@@ -17,7 +19,7 @@ data class GameConfig(
     val rankKyu: Int = 5,
     val humanPlaysBlack: Boolean = true,
     val aiStyle: AiStyle = AiStyle.Rank,
-) {
+) : JavaSerializable {
     init {
         require(boardSize == 9 || boardSize == 13 || boardSize == 19)
         require(rankKyu in -2..15)

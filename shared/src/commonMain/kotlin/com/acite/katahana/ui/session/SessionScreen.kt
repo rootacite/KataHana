@@ -60,22 +60,38 @@ import kotlinx.coroutines.launch
 
 class SessionScreen(
     private val config: GameConfig,
-    private val loadedTree: GameTree? = null,
+    loadedTree: GameTree? = null,
     private val recentId: String? = null,
     private val recentTitle: String? = null,
     private val instanceId: String = Random.nextLong().toULong().toString(16),
 ) : Screen {
     override val key: ScreenKey = "session-$instanceId"
 
+    init {
+        if (loadedTree != null) SessionTrees.put(instanceId, loadedTree)
+    }
+
     @Composable
     override fun Content() {
+        val tree = remember(instanceId) { SessionTrees.take(instanceId) }
         val vm = assistedMetroViewModel<SessionViewModel, SessionViewModel.Factory>(
             key = key,
         ) {
-            create(config, loadedTree, recentId, recentTitle)
+            create(config, tree, recentId, recentTitle)
         }
         SessionRoute(vm)
     }
+}
+
+/** GameTree is not Java-serializable; keep it off the Screen so Android stop/save cannot crash. */
+private object SessionTrees {
+    private val pending = mutableMapOf<String, GameTree>()
+
+    fun put(id: String, tree: GameTree) {
+        pending[id] = tree
+    }
+
+    fun take(id: String): GameTree? = pending.remove(id)
 }
 
 @Composable
