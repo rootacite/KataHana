@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
@@ -27,6 +29,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -137,45 +140,80 @@ fun WinrateTrack(
     modifier: Modifier = Modifier,
     blackWinrate: Float? = null,
     enabled: Boolean = true,
+    vertical: Boolean = false,
 ) {
     val tokens = hanaTokens
     val appearance = hanaAppearance
     val black = (blackWinrate ?: 0.5f).coerceIn(0f, 1f)
     val white = 1f - black
     val alpha = if (enabled) 1f else 0.38f
-    Row(
-        modifier,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        if (blackWinrate != null) {
-            Text(
-                "${(black * 100f).toInt()}%",
-                color = HanaColors.text.copy(alpha = alpha),
-                fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(end = 8.dp),
-            )
-        }
-        Row(
-            Modifier
-                .weight(1f)
-                .height(8.dp)
-                .clip(tokens.capsule)
-                .background(HanaColors.bgCard.copy(alpha = alpha))
-                .border(1.dp, HanaColors.stroke.copy(alpha = 0.6f * alpha), tokens.capsule),
+    val percentColor = HanaColors.text.copy(alpha = alpha)
+    val blackBox = Modifier.background(appearance.first.fill.copy(alpha = alpha))
+    val whiteBox = Modifier.background(appearance.second.fill.copy(alpha = alpha))
+    val trackShape = tokens.capsule
+    val trackBorder = Modifier
+        .clip(trackShape)
+        .background(HanaColors.bgCard.copy(alpha = alpha))
+        .border(1.dp, HanaColors.stroke.copy(alpha = 0.6f * alpha), trackShape)
+    if (vertical) {
+        Column(
+            modifier,
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Box(
-                Modifier
-                    .weight(black.coerceAtLeast(0.0001f))
-                    .fillMaxHeight()
-                    .background(appearance.first.fill.copy(alpha = alpha)),
-            )
-            Box(
-                Modifier
-                    .weight(white.coerceAtLeast(0.0001f))
-                    .fillMaxHeight()
-                    .background(appearance.second.fill.copy(alpha = alpha)),
-            )
+            if (blackWinrate != null) {
+                Text(
+                    "${(black * 100f).toInt()}%",
+                    color = percentColor,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    modifier = Modifier.padding(bottom = 6.dp),
+                )
+            }
+            Column(Modifier.weight(1f).width(8.dp).then(trackBorder)) {
+                Box(
+                    Modifier
+                        .weight(black.coerceAtLeast(0.0001f))
+                        .fillMaxWidth()
+                        .then(blackBox),
+                )
+                Box(
+                    Modifier
+                        .weight(white.coerceAtLeast(0.0001f))
+                        .fillMaxWidth()
+                        .then(whiteBox),
+                )
+            }
+        }
+    } else {
+        Row(
+            modifier,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (blackWinrate != null) {
+                Text(
+                    "${(black * 100f).toInt()}%",
+                    color = percentColor,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(end = 8.dp),
+                )
+            }
+            Row(Modifier.weight(1f).height(8.dp).then(trackBorder)) {
+                Box(
+                    Modifier
+                        .weight(black.coerceAtLeast(0.0001f))
+                        .fillMaxHeight()
+                        .then(blackBox),
+                )
+                Box(
+                    Modifier
+                        .weight(white.coerceAtLeast(0.0001f))
+                        .fillMaxHeight()
+                        .then(whiteBox),
+                )
+            }
         }
     }
 }

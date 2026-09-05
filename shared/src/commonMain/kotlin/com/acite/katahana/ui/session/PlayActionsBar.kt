@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
@@ -64,18 +65,30 @@ fun PlayIconCluster(
     onRedo: () -> Unit,
     onConfirm: () -> Unit,
     modifier: Modifier = Modifier,
+    vertical: Boolean = false,
 ) {
-    Row(
-        modifier = modifier,
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
-    ) {
+    val buttons: @Composable () -> Unit = {
         PlayGlyphButton(PlayGlyph.Pass, Copy.pass, humanTurn, onPass)
         PlayGlyphButton(PlayGlyph.Undo, Copy.undo, snapshot.canUndo, onUndo)
         PlayGlyphButton(PlayGlyph.Redo, Copy.redo, snapshot.canRedo, onRedo)
         if (hasSelection) {
             PlayGlyphButton(PlayGlyph.Confirm, Copy.confirm, humanTurn, onConfirm, emphasized = true)
         }
+    }
+    if (vertical) {
+        Column(
+            modifier = modifier,
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+            content = { buttons() },
+        )
+    } else {
+        Row(
+            modifier = modifier,
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+            content = { buttons() },
+        )
     }
 }
 

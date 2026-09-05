@@ -2,6 +2,7 @@ package com.acite.katahana.ui.session
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -26,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import cafe.adriel.voyager.core.screen.Screen
@@ -146,20 +148,22 @@ private fun SessionRoute(vm: SessionViewModel) {
         val humanTurn = !ui.aiThinking && !snapshot.ended && !snapshot.aiToPlay
         val hazeState = rememberHazeState()
         Column(Modifier.fillMaxSize().padding(top = chromePad)) {
-            SessionTopBar(
-                status = ui.engineStatus,
-                blackWinrate = ui.blackWinrate?.toFloat(),
-                reviewing = snapshot.reviewing,
-                compact = landscape,
-                onMenu = { drawerOpen = true },
-                snapshot = snapshot,
-                hasSelection = ui.selected != null,
-                humanTurn = humanTurn,
-                onPass = vm::pass,
-                onUndo = vm::undo,
-                onRedo = vm::redo,
-                onConfirm = vm::confirmSelected,
-            )
+            if (!landscape) {
+                SessionTopBar(
+                    status = ui.engineStatus,
+                    blackWinrate = ui.blackWinrate?.toFloat(),
+                    reviewing = snapshot.reviewing,
+                    compact = false,
+                    onMenu = { drawerOpen = true },
+                    snapshot = snapshot,
+                    hasSelection = ui.selected != null,
+                    humanTurn = humanTurn,
+                    onPass = vm::pass,
+                    onUndo = vm::undo,
+                    onRedo = vm::redo,
+                    onConfirm = vm::confirmSelected,
+                )
+            }
             HanaDrawer(
                 open = drawerOpen,
                 onOpenChange = { drawerOpen = it },
@@ -219,9 +223,21 @@ private fun SessionRoute(vm: SessionViewModel) {
                         .hazeSource(hazeState)
                         .padding(chromePad),
                 ) {
-                    val boardSide = minOf(maxWidth, maxHeight).coerceAtLeast(120.dp)
+                    val railTaken = if (landscape) SessionRailWidth + chromePad else 0.dp
+                    val fullSquare = minOf(maxWidth, maxHeight).coerceAtLeast(120.dp)
+                    val boardSide =
+                        if (landscape && maxWidth - fullSquare < railTaken) {
+                            minOf(maxHeight, maxWidth - railTaken).coerceAtLeast(120.dp)
+                        } else {
+                            fullSquare
+                        }
                     val leftover = maxWidth - boardSide
-                    val showSideTree = leftover >= 168.dp
+                    val treeW =
+                        if (leftover - railTaken >= 168.dp) {
+                            (leftover - railTaken).coerceAtMost(280.dp)
+                        } else {
+                            0.dp
+                        }
                     val board: @Composable () -> Unit = {
                         BoardCanvas(
                             snapshot = snapshot,
@@ -240,21 +256,42 @@ private fun SessionRoute(vm: SessionViewModel) {
                             deadPoints = if (showDeadStones) ui.deadPoints else emptySet(),
                         )
                     }
-                    if (showSideTree) {
+                    if (treeW > 0.dp || landscape) {
                         Row(
                             Modifier.fillMaxSize(),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            GameTreeCard(
-                                layout = ui.tree,
-                                reviewing = snapshot.reviewing,
-                                onGoToNode = vm::goToNode,
-                                compact = true,
-                                modifier = Modifier
-                                    .width(leftover.coerceAtMost(280.dp))
-                                    .fillMaxHeight()
-                                    .padding(end = chromePad),
-                            )
+                            if (treeW > 0.dp) {
+                                GameTreeCard(
+                                    layout = ui.tree,
+                                    reviewing = snapshot.reviewing,
+                                    onGoToNode = vm::goToNode,
+                                    compact = true,
+                                    modifier = Modifier
+                                        .width(treeW)
+                                        .fillMaxHeight(),
+                                )
+                                Spacer(Modifier.width(chromePad))
+                            }
+                            if (landscape) {
+                                SessionRail(
+                                    status = ui.engineStatus,
+                                    blackWinrate = ui.blackWinrate?.toFloat(),
+                                    reviewing = snapshot.reviewing,
+                                    onMenu = { drawerOpen = true },
+                                    snapshot = snapshot,
+                                    hasSelection = ui.selected != null,
+                                    humanTurn = humanTurn,
+                                    onPass = vm::pass,
+                                    onUndo = vm::undo,
+                                    onRedo = vm::redo,
+                                    onConfirm = vm::confirmSelected,
+                                    modifier = Modifier
+                                        .width(SessionRailWidth)
+                                        .fillMaxHeight(),
+                                )
+                                Spacer(Modifier.width(chromePad))
+                            }
                             Box(
                                 Modifier.weight(1f).fillMaxHeight(),
                                 contentAlignment = Alignment.Center,
@@ -310,20 +347,7 @@ internal fun SessionTopBar(
     ) {
         EngineDot(online = status.online)
         Spacer(Modifier.width(if (compact) 6.dp else 8.dp))
-        if (compact) {
-            Text(
-                Copy.menu,
-                color = HanaColors.accentLilac,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier
-                    .clip(hanaTokens.capsule)
-                    .clickable(onClick = onMenu)
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
-            )
-        } else {
-            QuietTextButton(Copy.menu, onClick = onMenu)
-        }
+        MenuChip(compact = compact, onClick = onMenu)
         Spacer(Modifier.width(if (compact) 6.dp else 8.dp))
         WinrateTrack(
             Modifier.weight(1f).padding(end = 4.dp),
@@ -340,24 +364,100 @@ internal fun SessionTopBar(
             onConfirm = onConfirm,
         )
         if (reviewing) {
-            Box(
-                Modifier
-                    .clip(hanaTokens.capsule)
-                    .background(HanaColors.accentPink.copy(alpha = 0.18f))
-                    .clickable(onClick = onMenu)
-                    .padding(
-                        horizontal = if (compact) 8.dp else 10.dp,
-                        vertical = if (compact) 2.dp else 5.dp,
-                    ),
-            ) {
-                Text(
-                    Copy.review,
-                    color = HanaColors.accentPink,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
+            ReviewChip(compact = compact, onClick = onMenu)
         }
+    }
+}
+
+private val SessionRailWidth = 64.dp
+
+@Composable
+private fun SessionRail(
+    status: EngineStatus,
+    blackWinrate: Float?,
+    reviewing: Boolean,
+    onMenu: () -> Unit,
+    snapshot: SessionSnapshot,
+    hasSelection: Boolean,
+    humanTurn: Boolean,
+    onPass: () -> Unit,
+    onUndo: () -> Unit,
+    onRedo: () -> Unit,
+    onConfirm: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier.padding(vertical = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        EngineDot(online = status.online)
+        MenuChip(compact = true, onClick = onMenu)
+        if (reviewing) {
+            ReviewChip(compact = true, onClick = onMenu)
+        }
+        WinrateTrack(
+            Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
+            blackWinrate = blackWinrate,
+            enabled = status.online,
+            vertical = true,
+        )
+        PlayIconCluster(
+            snapshot = snapshot,
+            hasSelection = hasSelection,
+            humanTurn = humanTurn,
+            onPass = onPass,
+            onUndo = onUndo,
+            onRedo = onRedo,
+            onConfirm = onConfirm,
+            vertical = true,
+        )
+    }
+}
+
+@Composable
+private fun MenuChip(compact: Boolean, onClick: () -> Unit) {
+    if (compact) {
+        Text(
+            Copy.menu,
+            color = HanaColors.accentLilac,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            modifier = Modifier
+                .clip(hanaTokens.capsule)
+                .clickable(onClick = onClick)
+                .padding(horizontal = 6.dp, vertical = 4.dp),
+        )
+    } else {
+        QuietTextButton(Copy.menu, onClick = onClick)
+    }
+}
+
+@Composable
+private fun ReviewChip(compact: Boolean, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .clip(hanaTokens.capsule)
+            .background(HanaColors.accentPink.copy(alpha = 0.18f))
+            .clickable(onClick = onClick)
+            .padding(
+                horizontal = if (compact) 4.dp else 10.dp,
+                vertical = if (compact) 2.dp else 5.dp,
+            ),
+    ) {
+        Text(
+            Copy.review,
+            color = HanaColors.accentPink,
+            fontSize = if (compact) 11.sp else 12.sp,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+        )
     }
 }
 

@@ -2,6 +2,7 @@ package com.acite.katahana.ui.board
 
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
@@ -49,7 +50,7 @@ private fun DrawScope.paintFace(center: Offset, r: Float, band: QualityBand, pen
         QualityBand.Inaccuracy -> drawThinkFace(center, r, pen)
         QualityBand.Mistake -> drawFlatFace(center, r, pen)
         QualityBand.BigMistake -> drawUnamusedFace(center, r, pen)
-        QualityBand.Blunder -> drawSickFace(center, r, pen)
+        QualityBand.Blunder -> drawSweatSmile(center, r, pen)
         QualityBand.Shallow -> drawDottedFace(center, r, pen)
     }
 }
@@ -140,29 +141,29 @@ private fun DrawScope.drawUnamusedFace(c: Offset, r: Float, pen: FacePen) {
     drawPath(frown, pen.color, style = pen.stroke)
 }
 
-/** sick: X eyes, open mouth, tongue */
-private fun DrawScope.drawSickFace(c: Offset, r: Float, pen: FacePen) {
-    seg(c, r, -0.40f, -0.28f, -0.16f, -0.04f, pen)
-    seg(c, r, -0.40f, -0.04f, -0.16f, -0.28f, pen)
-    seg(c, r, 0.16f, -0.28f, 0.40f, -0.04f, pen)
-    seg(c, r, 0.16f, -0.04f, 0.40f, -0.28f, pen)
-    val mouth = Rect(pt(c, r, -0.22f, 0.10f), pt(c, r, 0.22f, 0.42f))
+/** 😅: round eyes, open smile, sweat drop on the upper right. */
+private fun DrawScope.drawSweatSmile(c: Offset, r: Float, pen: FacePen) {
+    dot(c, r, -0.22f, -0.12f, pen, r * 0.09f)
+    dot(c, r, 0.22f, -0.12f, pen, r * 0.09f)
+    val mouth = Rect(pt(c, r, -0.24f, 0.10f), pt(c, r, 0.24f, 0.48f))
     if (pen.fill) {
         drawOval(pen.color.copy(alpha = 0.18f), topLeft = mouth.topLeft, size = mouth.size)
     }
     drawOval(pen.color, topLeft = mouth.topLeft, size = mouth.size, style = pen.stroke)
-    val tongue = Path().apply {
-        val a = pt(c, r, -0.10f, 0.32f)
-        val b = pt(c, r, 0.10f, 0.32f)
-        val tip = pt(c, r, 0.02f, 0.62f)
-        moveTo(a.x, a.y)
-        quadraticTo(tip.x, tip.y, b.x, b.y)
+    val drop = Path().apply {
+        val tip = pt(c, r, 0.74f, -0.72f)
+        val left = pt(c, r, 0.52f, -0.40f)
+        val right = pt(c, r, 0.82f, -0.36f)
+        val belly = pt(c, r, 0.68f, -0.18f)
+        moveTo(tip.x, tip.y)
+        quadraticTo(left.x, left.y, belly.x, belly.y)
+        quadraticTo(right.x, right.y, tip.x, tip.y)
         close()
     }
     if (pen.fill) {
-        drawPath(tongue, pen.color.copy(alpha = 0.85f), style = Fill)
+        drawPath(drop, pen.color.copy(alpha = 0.85f), style = Fill)
     }
-    drawPath(tongue, pen.color, style = pen.stroke)
+    drawPath(drop, pen.color, style = pen.stroke)
 }
 
 fun DrawScope.drawDeadFace(center: Offset, stoneRadius: Float, alpha: Float = 1f) {
@@ -185,24 +186,61 @@ fun DrawScope.drawDeadFace(center: Offset, stoneRadius: Float, alpha: Float = 1f
         pad = 0f,
         fill = true,
     )
-    paintHaloFace(center, r, outline)
-    paintHaloFace(center, r, ink)
+    paintRestingFace(center, r, outline)
+    paintRestingFace(center, r, ink)
+    val haloInk = FacePen(
+        color = HanaColors.qualityYellow.copy(alpha = a),
+        stroke = Stroke(width = colorW, cap = cap, join = join),
+        pad = 0f,
+        fill = true,
+    )
+    paintDeadHalo(center, r, outline)
+    paintDeadHalo(center, r, haloInk)
 }
 
-/** Dot eyes, small o mouth, and a compact halo just above the eyes. */
-private fun DrawScope.paintHaloFace(c: Offset, r: Float, pen: FacePen) {
-    val haloCenter = pt(c, r, 0f, -0.46f)
-    drawCircle(
+/** Flat ellipse worn on the crown, half the face stroke. */
+private fun DrawScope.paintDeadHalo(c: Offset, r: Float, pen: FacePen) {
+    val rx = r * 0.36f
+    val ry = r * 0.08f
+    val center = pt(c, r, 0f, -0.38f)
+    drawOval(
         color = pen.color,
-        radius = r * 0.16f + pen.pad,
-        center = haloCenter,
-        style = Stroke(width = pen.stroke.width, cap = pen.stroke.cap, join = pen.stroke.join),
+        topLeft = Offset(center.x - rx, center.y - ry),
+        size = Size(rx * 2f, ry * 2f),
+        style = Stroke(
+            width = pen.stroke.width * 0.5f,
+            cap = pen.stroke.cap,
+            join = pen.stroke.join,
+        ),
     )
-    val eyeA = pen.color.alpha
-    dot(c, r, -0.22f, -0.02f, pen, r * 0.08f, eyeA)
-    dot(c, r, 0.22f, -0.02f, pen, r * 0.08f, eyeA)
-    val mouth = Rect(pt(c, r, -0.11f, 0.22f), pt(c, r, 0.11f, 0.42f))
-    drawOval(pen.color, topLeft = mouth.topLeft, size = mouth.size, style = pen.stroke)
+}
+
+/** Closed lids and a small calm smile — at rest, not a ghost. */
+private fun DrawScope.paintRestingFace(c: Offset, r: Float, pen: FacePen) {
+    val leftLid = Path().apply {
+        val a = pt(c, r, -0.40f, -0.04f)
+        val b = pt(c, r, -0.12f, -0.04f)
+        val peak = pt(c, r, -0.26f, -0.20f)
+        moveTo(a.x, a.y)
+        quadraticTo(peak.x, peak.y, b.x, b.y)
+    }
+    val rightLid = Path().apply {
+        val a = pt(c, r, 0.12f, -0.04f)
+        val b = pt(c, r, 0.40f, -0.04f)
+        val peak = pt(c, r, 0.26f, -0.20f)
+        moveTo(a.x, a.y)
+        quadraticTo(peak.x, peak.y, b.x, b.y)
+    }
+    drawPath(leftLid, pen.color, style = pen.stroke)
+    drawPath(rightLid, pen.color, style = pen.stroke)
+    val smile = Path().apply {
+        val a = pt(c, r, -0.16f, 0.26f)
+        val b = pt(c, r, 0.16f, 0.26f)
+        val dip = pt(c, r, 0f, 0.38f)
+        moveTo(a.x, a.y)
+        quadraticTo(dip.x, dip.y, b.x, b.y)
+    }
+    drawPath(smile, pen.color, style = pen.stroke)
 }
 
 private fun DrawScope.drawDottedFace(c: Offset, r: Float, pen: FacePen) {
