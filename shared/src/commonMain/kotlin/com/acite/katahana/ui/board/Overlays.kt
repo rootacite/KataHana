@@ -53,7 +53,7 @@ fun DrawScope.drawLastMoveMark(
     ripple((pulse + 0.5f) % 1f)
 
     val ringR = radius * (1.18f + 0.05f * breath)
-    val ringW = (radius * (0.18f + 0.05f * breath)).coerceAtLeast(2.8f)
+    val ringW = (radius * (0.18f + 0.05f * breath) * 0.4f).coerceAtLeast(1.12f)
     drawCircle(
         color = backing.copy(alpha = 0.98f * a),
         radius = ringR,
