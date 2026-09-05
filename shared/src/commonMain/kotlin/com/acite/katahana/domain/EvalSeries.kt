@@ -67,9 +67,9 @@ fun niceAbs(maxAbs: Double, floor: Double): Double {
 }
 
 fun yMaxFor(samples: List<EvalSample>, mode: EvalGraphMode): Double {
-    val floor = if (mode == EvalGraphMode.Score) 5.0 else 10.0
+    if (mode == EvalGraphMode.Winrate) return 50.0
     val peak = samples.maxOfOrNull { abs(it.advantage(mode)) } ?: 0.0
-    return niceAbs(peak, floor)
+    return niceAbs(peak, 5.0)
 }
 
 /**

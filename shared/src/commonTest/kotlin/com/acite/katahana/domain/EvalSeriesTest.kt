@@ -23,13 +23,16 @@ class EvalSeriesTest {
     @Test
     fun yMaxIsSymmetricFloorForEmptyAndPeaked() {
         assertEquals(5.0, yMaxFor(emptyList(), EvalGraphMode.Score))
-        assertEquals(10.0, yMaxFor(emptyList(), EvalGraphMode.Winrate))
+        assertEquals(50.0, yMaxFor(emptyList(), EvalGraphMode.Winrate))
         val samples = listOf(
             EvalSample(1, 0.8, 12.0, "n1"),
             EvalSample(2, 0.2, -3.0, "n2"),
         )
         assertEquals(15.0, yMaxFor(samples, EvalGraphMode.Score))
         assertEquals(50.0, yMaxFor(samples, EvalGraphMode.Winrate))
+        val tight = listOf(EvalSample(1, 0.55, 1.0, "n"))
+        assertEquals(50.0, yMaxFor(tight, EvalGraphMode.Winrate))
+        assertEquals(5.0, yMaxFor(tight, EvalGraphMode.Score))
     }
 
     @Test

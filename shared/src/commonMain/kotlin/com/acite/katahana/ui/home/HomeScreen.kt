@@ -1,5 +1,6 @@
 package com.acite.katahana.ui.home
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -13,12 +14,9 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
@@ -34,8 +32,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -204,56 +202,42 @@ private fun HomeRoute() {
 
 @Composable
 private fun GlowOrbs() {
-    Box(Modifier.fillMaxSize()) {
-        Box(
-            Modifier
-                .size(360.dp)
-                .offset((-100).dp, (-80).dp)
-                .blur(72.dp)
-                .background(
-                    Brush.radialGradient(
-                        colors = listOf(
-                            HanaColors.accentPink.copy(alpha = 0.55f),
-                            HanaColors.accentPink.copy(alpha = 0.16f),
-                            Color.Transparent,
-                        ),
+    Canvas(Modifier.fillMaxSize()) {
+        fun orb(center: Offset, radius: Float, color: Color, core: Float, mid: Float) {
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        color.copy(alpha = core),
+                        color.copy(alpha = mid),
+                        Color.Transparent,
                     ),
-                    CircleShape,
+                    center = center,
+                    radius = radius,
                 ),
+                radius = radius,
+                center = center,
+            )
+        }
+        orb(
+            center = Offset(80.dp.toPx(), 100.dp.toPx()),
+            radius = 252.dp.toPx(),
+            color = HanaColors.accentPink,
+            core = 0.55f,
+            mid = 0.16f,
         )
-        Box(
-            Modifier
-                .size(320.dp)
-                .align(Alignment.TopEnd)
-                .offset(x = 90.dp, y = 10.dp)
-                .blur(80.dp)
-                .background(
-                    Brush.radialGradient(
-                        colors = listOf(
-                            HanaColors.accentBlue.copy(alpha = 0.48f),
-                            HanaColors.accentBlue.copy(alpha = 0.14f),
-                            Color.Transparent,
-                        ),
-                    ),
-                    CircleShape,
-                ),
+        orb(
+            center = Offset(size.width - 70.dp.toPx(), 170.dp.toPx()),
+            radius = 240.dp.toPx(),
+            color = HanaColors.accentBlue,
+            core = 0.48f,
+            mid = 0.14f,
         )
-        Box(
-            Modifier
-                .size(280.dp)
-                .align(Alignment.BottomStart)
-                .offset(x = (-30).dp, y = 50.dp)
-                .blur(84.dp)
-                .background(
-                    Brush.radialGradient(
-                        colors = listOf(
-                            HanaColors.accentLilac.copy(alpha = 0.42f),
-                            HanaColors.accentLilac.copy(alpha = 0.12f),
-                            Color.Transparent,
-                        ),
-                    ),
-                    CircleShape,
-                ),
+        orb(
+            center = Offset(110.dp.toPx(), size.height - 90.dp.toPx()),
+            radius = 224.dp.toPx(),
+            color = HanaColors.accentLilac,
+            core = 0.42f,
+            mid = 0.12f,
         )
     }
 }

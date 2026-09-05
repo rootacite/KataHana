@@ -19,7 +19,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
@@ -27,6 +29,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
@@ -51,6 +54,8 @@ import kotlin.math.hypot
 import kotlin.math.roundToInt
 
 private val PlotHeight = 128.dp
+private val PlotPadL = 40.dp
+private val PlotPadR = 14.dp
 
 @Composable
 fun SessionTreeColumn(
@@ -176,6 +181,9 @@ private fun EvalPlot(
     val labelStyle = remember {
         TextStyle(color = HanaColors.textDim, fontSize = 10.sp, fontWeight = FontWeight.Medium)
     }
+    val tagStyle = remember {
+        TextStyle(color = HanaColors.text, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+    }
     val yMax = yMaxFor(samples, mode)
     val xMax = maxOf(
         samples.maxOfOrNull { it.moveNumber } ?: 0,
@@ -186,8 +194,8 @@ private fun EvalPlot(
         modifier.pointerInput(samples, xMax) {
             detectTapGestures { offset ->
                 if (samples.isEmpty()) return@detectTapGestures
-                val padL = 28.dp.toPx()
-                val padR = 10.dp.toPx()
+                val padL = PlotPadL.toPx()
+                val padR = PlotPadR.toPx()
                 val plotW = (size.width - padL - padR).coerceAtLeast(1f)
                 val t = ((offset.x - padL) / plotW).coerceIn(0f, 1f)
                 val move = (t * xMax).roundToInt()
@@ -196,8 +204,8 @@ private fun EvalPlot(
             }
         },
     ) {
-        val padL = 28.dp.toPx()
-        val padR = 10.dp.toPx()
+        val padL = PlotPadL.toPx()
+        val padR = PlotPadR.toPx()
         val padT = 8.dp.toPx()
         val padB = 18.dp.toPx()
         val plotW = (size.width - padL - padR).coerceAtLeast(1f)
@@ -265,6 +273,17 @@ private fun EvalPlot(
                 center = p,
                 style = Stroke(width = 1.1.dp.toPx()),
             )
+            drawLiveTag(
+                text = formatLive(here, mode),
+                anchor = p,
+                measurer = measurer,
+                style = tagStyle,
+                zeroY = zeroY,
+                plotLeft = padL,
+                plotRight = padL + plotW,
+                plotTop = padT,
+                plotBottom = padT + plotH,
+            )
         }
 
         fun stamp(text: String, x: Float, y: Float, centerX: Boolean = false, centerY: Boolean = true) {
@@ -273,9 +292,12 @@ private fun EvalPlot(
             val top = if (centerY) y - layout.size.height / 2f else y
             drawText(layout, topLeft = Offset(left, top))
         }
-        stamp(formatAxis(yMax, mode), 4.dp.toPx(), padT + 2.dp.toPx(), centerY = false)
-        stamp(formatAxis(0.0, mode), 4.dp.toPx(), zeroY)
-        stamp(formatAxis(-yMax, mode), 4.dp.toPx(), padT + plotH - 2.dp.toPx() - 10.sp.toPx(), centerY = false)
+        val topTick = if (mode == EvalGraphMode.Winrate) "B 100%" else formatAxis(yMax)
+        val midTick = if (mode == EvalGraphMode.Winrate) "50%" else formatAxis(0.0)
+        val botTick = if (mode == EvalGraphMode.Winrate) "W 100%" else formatAxis(-yMax)
+        stamp(topTick, 4.dp.toPx(), padT + 2.dp.toPx(), centerY = false)
+        stamp(midTick, 4.dp.toPx(), zeroY)
+        stamp(botTick, 4.dp.toPx(), padT + plotH - 2.dp.toPx() - 10.sp.toPx(), centerY = false)
         stamp("0", xOf(0), padT + plotH + 2.dp.toPx(), centerX = true, centerY = false)
         stamp(xMax.toString(), xOf(xMax), padT + plotH + 2.dp.toPx(), centerX = true, centerY = false)
 
@@ -335,13 +357,58 @@ private fun curveInk(swatch: StoneSwatch): Color {
 private fun luminance(c: Color): Float =
     0.2126f * c.red + 0.7152f * c.green + 0.0722f * c.blue
 
-private fun formatAxis(value: Double, mode: EvalGraphMode): String {
-    if (abs(value) < 0.05) return if (mode == EvalGraphMode.Winrate) "0%" else "0"
+private fun DrawScope.drawLiveTag(
+    text: String,
+    anchor: Offset,
+    measurer: TextMeasurer,
+    style: TextStyle,
+    zeroY: Float,
+    plotLeft: Float,
+    plotRight: Float,
+    plotTop: Float,
+    plotBottom: Float,
+) {
+    val layout = measurer.measure(text, style)
+    val padX = 6.dp.toPx()
+    val padY = 3.dp.toPx()
+    val tagW = layout.size.width + padX * 2
+    val tagH = layout.size.height + padY * 2
+    val gap = 8.dp.toPx()
+    var x = anchor.x - tagW / 2f
+    if (x < plotLeft) x = plotLeft
+    if (x + tagW > plotRight) x = (plotRight - tagW).coerceAtLeast(plotLeft)
+    val preferAbove = anchor.y <= zeroY
+    val aboveY = anchor.y - gap - tagH
+    val belowY = anchor.y + gap
+    var y = if (preferAbove) aboveY else belowY
+    if (y < plotTop) y = belowY
+    if (y + tagH > plotBottom) y = aboveY
+    if (y < plotTop) y = plotTop
+    if (y + tagH > plotBottom) y = plotBottom - tagH
+    val origin = Offset(x, y)
+    val box = Size(tagW, tagH)
+    val radius = CornerRadius(6.dp.toPx())
+    drawRoundRect(HanaColors.bgCard.copy(alpha = 0.92f), origin, box, radius)
+    drawRoundRect(
+        color = HanaColors.stroke.copy(alpha = 0.55f),
+        topLeft = origin,
+        size = box,
+        cornerRadius = radius,
+        style = Stroke(width = 1.dp.toPx()),
+    )
+    drawText(layout, topLeft = Offset(x + padX, y + padY))
+}
+
+private fun formatLive(sample: EvalSample, mode: EvalGraphMode): String = when (mode) {
+    EvalGraphMode.Winrate -> "${(sample.blackWinrate * 100.0).roundToInt().coerceIn(0, 100)}%"
+    EvalGraphMode.Score -> formatAxis(sample.blackScoreLead)
+}
+
+private fun formatAxis(value: Double): String {
+    if (abs(value) < 0.05) return "0"
     val sign = if (value > 0) "+" else "−"
     val mag = abs(value)
-    val body = if (mode == EvalGraphMode.Winrate) {
-        "${mag.roundToInt()}%"
-    } else if (abs(mag - mag.roundToInt()) < 0.05) {
+    val body = if (abs(mag - mag.roundToInt()) < 0.05) {
         mag.roundToInt().toString()
     } else {
         val tenths = (mag * 10.0).roundToInt()
