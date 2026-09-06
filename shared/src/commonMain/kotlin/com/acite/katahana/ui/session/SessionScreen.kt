@@ -184,7 +184,6 @@ private fun SessionRoute(vm: SessionViewModel) {
                 SessionTopBar(
                     status = ui.engineStatus,
                     blackWinrate = ui.blackWinrate?.toFloat(),
-                    reviewing = snapshot.reviewing,
                     compact = false,
                     onMenu = { drawerOpen = true },
                     snapshot = snapshot,
@@ -348,7 +347,6 @@ private fun SessionRoute(vm: SessionViewModel) {
                                     SessionRail(
                                         status = ui.engineStatus,
                                         blackWinrate = ui.blackWinrate?.toFloat(),
-                                        reviewing = snapshot.reviewing,
                                         onMenu = { drawerOpen = true },
                                         snapshot = snapshot,
                                         hasSelection = ui.selected != null,
@@ -429,7 +427,6 @@ internal fun SessionTopBar(
     forecastActive: Boolean = false,
     onEndForecast: () -> Unit = {},
     onExitReview: () -> Unit = {},
-    reviewing: Boolean = false,
     compact: Boolean = false,
 ) {
     Row(
@@ -460,9 +457,6 @@ internal fun SessionTopBar(
             onEndForecast = onEndForecast,
             onExitReview = onExitReview,
         )
-        if (reviewing) {
-            ReviewChip(compact = compact, onClick = onExitReview)
-        }
     }
 }
 
@@ -470,7 +464,6 @@ internal fun SessionTopBar(
 private fun SessionRail(
     status: EngineStatus,
     blackWinrate: Float?,
-    reviewing: Boolean,
     onMenu: () -> Unit,
     snapshot: SessionSnapshot,
     hasSelection: Boolean,
@@ -491,9 +484,6 @@ private fun SessionRail(
     ) {
         EngineDot(online = status.online)
         MenuChip(compact = true, onClick = onMenu)
-        if (reviewing) {
-            ReviewChip(compact = true, onClick = onExitReview)
-        }
         WinrateTrack(
             Modifier
                 .weight(1f)
@@ -536,29 +526,6 @@ private fun MenuChip(compact: Boolean, onClick: () -> Unit) {
         )
     } else {
         QuietTextButton(Copy.menu, onClick = onClick)
-    }
-}
-
-@Composable
-private fun ReviewChip(compact: Boolean, onClick: () -> Unit) {
-    Box(
-        Modifier
-            .clip(hanaTokens.capsule)
-            .background(hanaColors.accentPink.copy(alpha = 0.18f))
-            .clickable(onClick = onClick)
-            .padding(
-                horizontal = if (compact) 4.dp else 10.dp,
-                vertical = if (compact) 2.dp else 5.dp,
-            ),
-    ) {
-        Text(
-            Copy.exitReview,
-            color = hanaColors.accentPink,
-            fontSize = if (compact) 11.sp else 12.sp,
-            fontWeight = FontWeight.SemiBold,
-            textAlign = TextAlign.Center,
-            maxLines = 1,
-        )
     }
 }
 

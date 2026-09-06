@@ -71,8 +71,8 @@ internal fun computeSessionLayout(
 `SessionTreeRow` / `SessionTreeColumn` 组织。顶栏
 （纵屏 `SessionTopBar`）与侧 rail（横屏 `SessionRail`）放引擎状态点、菜单、
 `WinrateTrack`（胜负条）、`PlayIconCluster`（附加按钮 Resume / EndPreview / 确认
-在前，Pass/Undo/Redo 固定贴在簇的尾沿，避免 Undo 后出现的按钮把常驻三键挤开）
-与复盘标记 `ReviewChip`。**横屏的 rail 与抽屉**：rail 是窄条快捷区，
+在前，Pass/Undo/Redo 固定贴在簇的尾沿，避免 Undo 后出现的按钮把常驻三键挤开）。
+复盘时的退出键就是簇首位的 ▶| `Resume` 图标按钮。**横屏的 rail 与抽屉**：rail 是窄条快捷区，
 抽屉 `HanaDrawer`（ModalNavigationDrawer + Haze 模糊）承担全部次级功能，内容在
 `SidePanel.kt`：状态卡（座位、行棋方、手数/贴目/提子，点座位弹 Seat 弹窗）、AI
 状态、走子按钮簇、变化图行、三张分析卡、六个显示开关、整局复盘按钮、候选点卡、
