@@ -14,6 +14,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -39,6 +40,8 @@ fun PlayActionsBar(
     onUndo: () -> Unit,
     onRedo: () -> Unit,
     onConfirm: () -> Unit,
+    forecastActive: Boolean = false,
+    onEndForecast: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -49,6 +52,9 @@ fun PlayActionsBar(
         PlayGlyphButton(PlayGlyph.Pass, Copy.pass, humanTurn, onPass)
         PlayGlyphButton(PlayGlyph.Undo, Copy.undo, snapshot.humanControls && snapshot.canUndo, onUndo)
         PlayGlyphButton(PlayGlyph.Redo, Copy.redo, snapshot.humanControls && snapshot.canRedo, onRedo)
+        if (forecastActive) {
+            PlayGlyphButton(PlayGlyph.EndForecast, Copy.endForecast, true, onEndForecast)
+        }
         if (hasSelection) {
             PlayGlyphButton(PlayGlyph.Confirm, Copy.confirm, humanTurn, onConfirm, emphasized = true)
         }
@@ -64,6 +70,8 @@ fun PlayIconCluster(
     onUndo: () -> Unit,
     onRedo: () -> Unit,
     onConfirm: () -> Unit,
+    forecastActive: Boolean = false,
+    onEndForecast: () -> Unit = {},
     modifier: Modifier = Modifier,
     vertical: Boolean = false,
 ) {
@@ -71,6 +79,9 @@ fun PlayIconCluster(
         PlayGlyphButton(PlayGlyph.Pass, Copy.pass, humanTurn, onPass)
         PlayGlyphButton(PlayGlyph.Undo, Copy.undo, snapshot.humanControls && snapshot.canUndo, onUndo)
         PlayGlyphButton(PlayGlyph.Redo, Copy.redo, snapshot.humanControls && snapshot.canRedo, onRedo)
+        if (forecastActive) {
+            PlayGlyphButton(PlayGlyph.EndForecast, Copy.endForecast, true, onEndForecast)
+        }
         if (hasSelection) {
             PlayGlyphButton(PlayGlyph.Confirm, Copy.confirm, humanTurn, onConfirm, emphasized = true)
         }
@@ -92,7 +103,7 @@ fun PlayIconCluster(
     }
 }
 
-private enum class PlayGlyph { Pass, Undo, Redo, Confirm }
+private enum class PlayGlyph { Pass, Undo, Redo, Confirm, EndForecast }
 
 @Composable
 private fun PlayGlyphButton(
@@ -156,6 +167,22 @@ private fun DrawScope.drawPlayGlyph(glyph: PlayGlyph, color: Color) {
                 lineTo(s * 0.84f, s * 0.24f)
             }
             drawPath(check, color, style = stroke)
+        }
+        PlayGlyph.EndForecast -> {
+            drawLine(
+                color = color,
+                start = Offset(s * 0.22f, s * 0.22f),
+                end = Offset(s * 0.78f, s * 0.78f),
+                strokeWidth = stroke.width,
+                cap = StrokeCap.Round,
+            )
+            drawLine(
+                color = color,
+                start = Offset(s * 0.78f, s * 0.22f),
+                end = Offset(s * 0.22f, s * 0.78f),
+                strokeWidth = stroke.width,
+                cap = StrokeCap.Round,
+            )
         }
     }
 }

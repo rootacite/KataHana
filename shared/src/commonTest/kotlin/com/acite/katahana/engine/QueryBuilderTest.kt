@@ -1,7 +1,9 @@
 package com.acite.katahana.engine
 
 import com.acite.katahana.domain.GameTree
+import com.acite.katahana.domain.Move
 import com.acite.katahana.domain.Point
+import com.acite.katahana.domain.StoneColor
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -86,6 +88,64 @@ class QueryBuilderTest {
             buildGenmoveQuery("sess", tree.current.id, "1", tree, maxVisits = 400),
         )
         assertTrue(!gen.contains("humanSLProfile"))
+    }
+
+    @Test
+    fun forecastQueryAppendsOriginAndAsksFifteenPv() {
+        val tree = GameTree(9)
+        tree.play(Point(4, 4))
+        val origin = Point(3, 3)
+        val query = buildForecastQuery("sess", tree.current.id, "ab", tree, origin, maxVisits = 400)
+        assertTrue(query.id.contains(":forecast:"))
+        assertTrue(query.id.startsWith("sess:${tree.current.id}:forecast:"))
+        assertEquals(
+            listOf(listOf("B", "E5"), listOf("W", "D6")),
+            query.moves,
+        )
+        assertEquals(listOf(2), query.analyzeTurns)
+        assertEquals(15, query.analysisPVLen)
+        assertEquals(400, query.maxVisits)
+        assertEquals(true, query.includeOwnership)
+        assertEquals(false, query.includePolicy)
+        assertEquals(null, query.reportDuringSearchEvery)
+    }
+
+    @Test
+    fun forecastOwnershipQuerySkipsPlyOneAndKeepsOwnership() {
+        val tree = GameTree(9)
+        val origin = Point(4, 4)
+        val continuation = listOf(
+            Move.Place(StoneColor.Black, origin),
+            Move.Place(StoneColor.White, Point(3, 3)),
+            Move.Place(StoneColor.Black, Point(5, 5)),
+        )
+        val query = buildForecastOwnershipQuery(
+            "sess",
+            tree.current.id,
+            "cd",
+            tree,
+            continuation,
+            maxVisits = 400,
+        )
+        assertTrue(query.id.contains(":forecast-own:"))
+        assertEquals(listOf(2, 3), query.analyzeTurns)
+        assertEquals(3, query.moves.size)
+        assertEquals(true, query.includeOwnership)
+        assertEquals(false, query.includePolicy)
+        assertEquals(400, query.maxVisits)
+        assertEquals(15, query.analysisPVLen)
+        assertEquals(null, query.reportDuringSearchEvery)
+    }
+
+    @Test
+    fun forecastOwnershipQueryEmptyWhenOnlyOrigin() {
+        val tree = GameTree(9)
+        val continuation = listOf(
+            Move.Place(StoneColor.Black, Point(4, 4)),
+        )
+        val query = buildForecastOwnershipQuery("sess", tree.current.id, "ef", tree, continuation, 80)
+        assertEquals(emptyList(), query.analyzeTurns)
+        assertEquals(1, query.moves.size)
     }
 
     @Test

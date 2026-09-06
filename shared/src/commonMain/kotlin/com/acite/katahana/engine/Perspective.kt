@@ -80,6 +80,24 @@ fun pointsLost(
     return sign * (bestScoreLead - moveScoreLead)
 }
 
+fun forecastOriginLoss(
+    originGtp: String,
+    toPlay: StoneColor,
+    parentMoveInfos: List<MoveInfo>,
+    parentBlackScoreLead: Double,
+    afterBlackScoreLead: Double?,
+): Double? {
+    val info = parentMoveInfos.find { it.move.equals(originGtp, ignoreCase = true) }
+    if (info != null) {
+        val bestLead = parentMoveInfos.minByOrNull { it.order }?.scoreLead ?: parentBlackScoreLead
+        return pointsLost(bestLead, info.scoreLead, toPlay)
+    }
+    if (afterBlackScoreLead != null) {
+        return pointsLost(parentBlackScoreLead, afterBlackScoreLead, toPlay)
+    }
+    return null
+}
+
 /** KaTrain-style delta: 0.0 for the best, negative when worse. */
 fun formatScoreLoss(pointsLost: Double): String {
     val tenths = kotlin.math.round(-pointsLost * 10.0).toInt()

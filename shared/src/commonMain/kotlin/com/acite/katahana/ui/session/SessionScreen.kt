@@ -185,6 +185,8 @@ private fun SessionRoute(vm: SessionViewModel) {
                     onUndo = vm::undo,
                     onRedo = vm::redo,
                     onConfirm = vm::confirmSelected,
+                    forecastActive = ui.forecast != null,
+                    onEndForecast = vm::endForecast,
                 )
             }
             HanaDrawer(
@@ -219,6 +221,8 @@ private fun SessionRoute(vm: SessionViewModel) {
                         onUndo = vm::undo,
                         onRedo = vm::redo,
                         onConfirm = vm::confirmSelected,
+                        forecastActive = ui.forecast != null,
+                        onEndForecast = vm::endForecast,
                         onCycleVariation = vm::cycleVariation,
                         onGoToNode = vm::goToNode,
                         tree = ui.tree,
@@ -274,14 +278,17 @@ private fun SessionRoute(vm: SessionViewModel) {
                             onHover = vm::onHover,
                             onActivate = vm::onActivate,
                             onAim = vm::onAim,
+                            onForecast = vm::onForecast,
                             modifier = Modifier.size(boardSide),
                             candidates = boardCandidates,
                             qualities = boardQualities,
                             showConnections = showConnections,
                             ownership = ui.ownership,
-                            showOwnership = showOwnership,
+                            showOwnership = showOwnership || ui.forecastRevealed > 0,
                             ownershipStyle = ownershipStyle,
                             deadPoints = if (showDeadStones) ui.deadPoints else emptySet(),
+                            forecast = ui.forecast,
+                            forecastRevealed = ui.forecastRevealed,
                         )
                     }
                     if (treeW > 0.dp || landscape) {
@@ -318,6 +325,8 @@ private fun SessionRoute(vm: SessionViewModel) {
                                     onUndo = vm::undo,
                                     onRedo = vm::redo,
                                     onConfirm = vm::confirmSelected,
+                                    forecastActive = ui.forecast != null,
+                                    onEndForecast = vm::endForecast,
                                     modifier = Modifier
                                         .width(SessionRailWidth)
                                         .fillMaxHeight(),
@@ -375,6 +384,8 @@ internal fun SessionTopBar(
     onUndo: () -> Unit,
     onRedo: () -> Unit,
     onConfirm: () -> Unit,
+    forecastActive: Boolean = false,
+    onEndForecast: () -> Unit = {},
     reviewing: Boolean = false,
     compact: Boolean = false,
 ) {
@@ -402,6 +413,8 @@ internal fun SessionTopBar(
             onUndo = onUndo,
             onRedo = onRedo,
             onConfirm = onConfirm,
+            forecastActive = forecastActive,
+            onEndForecast = onEndForecast,
         )
         if (reviewing) {
             ReviewChip(compact = compact, onClick = onMenu)
@@ -424,6 +437,8 @@ private fun SessionRail(
     onUndo: () -> Unit,
     onRedo: () -> Unit,
     onConfirm: () -> Unit,
+    forecastActive: Boolean = false,
+    onEndForecast: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -453,6 +468,8 @@ private fun SessionRail(
             onUndo = onUndo,
             onRedo = onRedo,
             onConfirm = onConfirm,
+            forecastActive = forecastActive,
+            onEndForecast = onEndForecast,
             vertical = true,
         )
     }

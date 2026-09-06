@@ -10,6 +10,7 @@ import com.acite.katahana.engine.EngineProfile
 import com.acite.katahana.engine.EngineStatus
 import com.acite.katahana.engine.TestResult
 import com.acite.katahana.domain.GameConfig
+import com.acite.katahana.settings.FORECAST_DROP_MS_DEFAULT
 import com.acite.katahana.settings.OwnershipStyle
 import com.acite.katahana.settings.QualityThresholds
 import com.acite.katahana.settings.SettingsRepository
@@ -73,6 +74,9 @@ class SettingsViewModel(
     val drawerAcrylic: StateFlow<Float> = repo.drawerAcrylic.stateIn(
         viewModelScope, SharingStarted.WhileSubscribed(1_000), 0.55f,
     )
+    val forecastDropMs: StateFlow<Int> = repo.forecastDropMs.stateIn(
+        viewModelScope, SharingStarted.WhileSubscribed(1_000), FORECAST_DROP_MS_DEFAULT,
+    )
     val lastGame: StateFlow<GameConfig> = repo.lastGame.stateIn(
         viewModelScope, SharingStarted.WhileSubscribed(1_000), GameConfig(),
     )
@@ -90,6 +94,7 @@ class SettingsViewModel(
     fun setReviewVisits(value: Int) = launch { repo.setReviewVisits(value) }
     fun setQuality(value: QualityThresholds) = launch { repo.setQuality(value) }
     fun setDrawerAcrylic(value: Float) = launch { repo.setDrawerAcrylic(value) }
+    fun setForecastDropMs(value: Int) = launch { repo.setForecastDropMs(value) }
 
     fun testConnection() {
         if (_testBusy.value) return

@@ -23,6 +23,9 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import okio.Path.Companion.toPath
 
+const val FORECAST_DROP_MS_DEFAULT = 400
+const val FORECAST_DROP_MS_MAX = 3000
+
 data class QualityThresholds(
     val blunder: Float = 12f,
     val bigMistake: Float = 6f,
@@ -62,6 +65,9 @@ class SettingsRepository {
     val engineToken: Flow<String> = dataStore.data.map { it[Keys.ENGINE_TOKEN] ?: "" }
     val playVisits: Flow<Int> = dataStore.data.map { it[Keys.PLAY_VISITS] ?: 400 }
     val reviewVisits: Flow<Int> = dataStore.data.map { it[Keys.REVIEW_VISITS] ?: 400 }
+    val forecastDropMs: Flow<Int> = dataStore.data.map {
+        (it[Keys.FORECAST_DROP_MS] ?: FORECAST_DROP_MS_DEFAULT).coerceIn(0, FORECAST_DROP_MS_MAX)
+    }
     val engineProfile: Flow<EngineProfile> = dataStore.data.map { prefs ->
         EngineProfile(
             name = prefs[Keys.ENGINE_NAME] ?: "KataGo",
@@ -118,6 +124,9 @@ class SettingsRepository {
     suspend fun setEngineToken(value: String) = edit { it[Keys.ENGINE_TOKEN] = value }
     suspend fun setPlayVisits(value: Int) = edit { it[Keys.PLAY_VISITS] = value.coerceAtLeast(1) }
     suspend fun setReviewVisits(value: Int) = edit { it[Keys.REVIEW_VISITS] = value.coerceAtLeast(1) }
+    suspend fun setForecastDropMs(value: Int) = edit {
+        it[Keys.FORECAST_DROP_MS] = value.coerceIn(0, FORECAST_DROP_MS_MAX)
+    }
     suspend fun setLastGame(value: GameConfig) = edit {
         it[Keys.LAST_SIZE] = value.boardSize
         it[Keys.LAST_KOMI] = value.komi
@@ -159,6 +168,7 @@ class SettingsRepository {
         val ENGINE_TOKEN = stringPreferencesKey("engine_token")
         val PLAY_VISITS = intPreferencesKey("play_visits")
         val REVIEW_VISITS = intPreferencesKey("review_visits")
+        val FORECAST_DROP_MS = intPreferencesKey("forecast_drop_ms")
         val Q_BLUNDER = floatPreferencesKey("quality_blunder")
         val Q_BIG = floatPreferencesKey("quality_big")
         val Q_MISTAKE = floatPreferencesKey("quality_mistake")

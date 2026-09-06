@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.sp
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
+import com.acite.katahana.settings.FORECAST_DROP_MS_MAX
 import com.acite.katahana.settings.OwnershipStyle
 import com.acite.katahana.ui.Copy
 import com.acite.katahana.ui.board.OwnershipMotion
@@ -74,6 +75,7 @@ private fun SettingsRoute(vm: SettingsViewModel) {
     val ownershipStyle by vm.ownershipStyle.collectAsState()
     val quality by vm.quality.collectAsState()
     val acrylic by vm.drawerAcrylic.collectAsState()
+    val forecastDropMs by vm.forecastDropMs.collectAsState()
     val tokens = hanaTokens
 
     Column(
@@ -134,6 +136,27 @@ private fun SettingsRoute(vm: SettingsViewModel) {
         HanaSection(Copy.boardSection) {
             ToggleRow(Copy.confirmMove, confirm, vm::setConfirmMove)
             ToggleRow(Copy.showCoords, coords, vm::setShowCoords)
+        }
+        HanaSection(Copy.forecastDrop, hint = Copy.forecastDropHint) {
+            val seconds = forecastDropMs / 1000f
+            Text(
+                if (forecastDropMs <= 0) Copy.forecastDropInstant else Copy.forecastDropValue(seconds),
+                color = HanaColors.accentLilac,
+                fontSize = 13.sp,
+            )
+            Slider(
+                value = seconds,
+                onValueChange = { raw ->
+                    val snapped = (raw * 10f).toInt() * 100
+                    vm.setForecastDropMs(snapped.coerceIn(0, FORECAST_DROP_MS_MAX))
+                },
+                valueRange = 0f..(FORECAST_DROP_MS_MAX / 1000f),
+                colors = SliderDefaults.colors(
+                    thumbColor = HanaColors.accentPink,
+                    activeTrackColor = HanaColors.accentPink,
+                    inactiveTrackColor = HanaColors.stroke,
+                ),
+            )
         }
         HanaSection(Copy.ownershipStyle, hint = Copy.ownershipStyleHint) {
             OwnershipStyle.entries.forEach { style ->

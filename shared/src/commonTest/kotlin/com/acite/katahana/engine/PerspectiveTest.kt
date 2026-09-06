@@ -78,6 +78,34 @@ class PerspectiveTest {
     }
 
     @Test
+    fun forecastOriginLossPrefersParentMoveInfo() {
+        val infos = listOf(
+            MoveInfo(move = "E5", order = 0, scoreLead = 4.0),
+            MoveInfo(move = "D4", order = 1, scoreLead = 2.5),
+        )
+        val loss = forecastOriginLoss(
+            originGtp = "D4",
+            toPlay = StoneColor.Black,
+            parentMoveInfos = infos,
+            parentBlackScoreLead = 4.0,
+            afterBlackScoreLead = 2.4,
+        )
+        assertEquals(1.5, loss!!, 1e-9)
+    }
+
+    @Test
+    fun forecastOriginLossFallsBackToAfterLead() {
+        val loss = forecastOriginLoss(
+            originGtp = "C3",
+            toPlay = StoneColor.White,
+            parentMoveInfos = emptyList(),
+            parentBlackScoreLead = -1.0,
+            afterBlackScoreLead = 0.5,
+        )
+        assertEquals(1.5, loss!!, 1e-9)
+    }
+
+    @Test
     fun formatPvTruncates() {
         val pv = listOf("E5", "G5", "F6", "D6", "C5")
         assertEquals("E5 G5 F6", formatPv(pv, limit = 3))

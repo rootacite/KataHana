@@ -1,11 +1,14 @@
 package com.acite.katahana.engine
 
+import com.acite.katahana.domain.FORECAST_MAX_PLIES
 import com.acite.katahana.domain.GameTree
 import com.acite.katahana.domain.Move
+import com.acite.katahana.domain.Point
 import com.acite.katahana.domain.StoneColor
 import com.acite.katahana.domain.humanSlProfile
 
 const val ANALYSIS_PV_LEN = 12
+const val FORECAST_PV_LEN = FORECAST_MAX_PLIES - 1
 
 fun StoneColor.toGtp(): String = if (this == StoneColor.Black) "B" else "W"
 
@@ -114,6 +117,64 @@ fun buildHumanQuery(
             humanSLProfile = humanSlProfile(rankKyu),
             ignorePreRootHistory = false,
         ),
+    )
+}
+
+fun buildForecastQuery(
+    sessionId: String,
+    nodeId: String,
+    nonce: String,
+    tree: GameTree,
+    origin: Point,
+    maxVisits: Int,
+): AnalysisQuery {
+    val first = Move.Place(tree.current.position.toPlay, origin)
+    val moves = (tree.lineMoves() + first).map { it.toGtpPair(tree.size) }
+    return AnalysisQuery(
+        id = "$sessionId:$nodeId:forecast:$nonce",
+        rules = tree.rules,
+        komi = tree.komi.toDouble(),
+        boardXSize = tree.size,
+        boardYSize = tree.size,
+        moves = moves,
+        analyzeTurns = listOf(moves.size),
+        maxVisits = maxVisits,
+        includeOwnership = true,
+        includePolicy = false,
+        reportDuringSearchEvery = null,
+        analysisPVLen = FORECAST_PV_LEN,
+    )
+}
+
+fun buildForecastOwnershipQuery(
+    sessionId: String,
+    nodeId: String,
+    nonce: String,
+    tree: GameTree,
+    continuation: List<Move>,
+    maxVisits: Int,
+): AnalysisQuery {
+    val path = tree.lineMoves()
+    val moves = (path + continuation).map { it.toGtpPair(tree.size) }
+    val pathLen = path.size
+    val turns = if (continuation.size <= 1) {
+        emptyList()
+    } else {
+        ((pathLen + 2)..(pathLen + continuation.size)).toList()
+    }
+    return AnalysisQuery(
+        id = "$sessionId:$nodeId:forecast-own:$nonce",
+        rules = tree.rules,
+        komi = tree.komi.toDouble(),
+        boardXSize = tree.size,
+        boardYSize = tree.size,
+        moves = moves,
+        analyzeTurns = turns,
+        maxVisits = maxVisits,
+        includeOwnership = true,
+        includePolicy = false,
+        reportDuringSearchEvery = null,
+        analysisPVLen = FORECAST_PV_LEN,
     )
 }
 

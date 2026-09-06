@@ -54,6 +54,8 @@ fun SidePanel(
     onUndo: () -> Unit,
     onRedo: () -> Unit,
     onConfirm: () -> Unit,
+    forecastActive: Boolean = false,
+    onEndForecast: () -> Unit = {},
     modifier: Modifier = Modifier,
     engineOnline: Boolean = false,
     analyzing: Boolean = false,
@@ -128,6 +130,8 @@ fun SidePanel(
             onUndo = onUndo,
             onRedo = onRedo,
             onConfirm = onConfirm,
+            forecastActive = forecastActive,
+            onEndForecast = onEndForecast,
         )
         if (snapshot.variationCount > 1) {
             VariationRow(snapshot.variationIndex, snapshot.variationCount, onCycleVariation)

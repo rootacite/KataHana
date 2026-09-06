@@ -11,6 +11,7 @@ import com.acite.katahana.ai.recentQualities
 import com.acite.katahana.domain.EvalGraphMode
 import com.acite.katahana.domain.EvalSample
 import com.acite.katahana.domain.EvalView
+import com.acite.katahana.domain.Forecast
 import com.acite.katahana.domain.GameConfig
 import com.acite.katahana.domain.GameSession
 import com.acite.katahana.domain.GameTree
@@ -20,9 +21,12 @@ import com.acite.katahana.domain.PlayResult
 import com.acite.katahana.domain.PlayerSeat
 import com.acite.katahana.domain.Point
 import com.acite.katahana.domain.QualityStats
+import com.acite.katahana.domain.Rules
 import com.acite.katahana.domain.SeatKind
 import com.acite.katahana.domain.SessionSnapshot
 import com.acite.katahana.domain.StoneColor
+import com.acite.katahana.domain.buildForecastLine
+import com.acite.katahana.domain.canRevealForecastPly
 import com.acite.katahana.domain.toStorageId
 import com.acite.katahana.domain.TreeLayout
 import com.acite.katahana.domain.layout
@@ -36,6 +40,7 @@ import com.acite.katahana.engine.EngineStatus
 import com.acite.katahana.engine.AnalysisResponse
 import com.acite.katahana.engine.LiveAnalysis
 import com.acite.katahana.engine.MoveInfo
+import com.acite.katahana.engine.forecastOriginLoss
 import com.acite.katahana.engine.pointsLost
 import com.acite.katahana.engine.DEAD_MIN_VISITS
 import com.acite.katahana.engine.classifyDead
@@ -65,7 +70,11 @@ import dev.zacsweers.metrox.viewmodel.ManualViewModelAssistedFactoryKey
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.random.Random
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.time.TimeSource
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -96,6 +105,8 @@ data class SessionUiState(
     val reviewProgress: ReviewProgress? = null,
     val dirty: Boolean = false,
     val canSave: Boolean = false,
+    val forecast: Forecast? = null,
+    val forecastRevealed: Int = 0,
 ) {
     /** Ghost stone under the pointer. Hidden when the human cannot place. */
     val preview: Point?
@@ -145,6 +156,7 @@ class SessionViewModel(
     private val nodeEvals = mutableMapOf<String, StoredEval>()
     private var aiJob: Job? = null
     private var reviewJob: Job? = null
+    private var forecastJob: Job? = null
     private var navEpoch = 0
     private var deadOwnershipNodeId: String? = null
     private var boundId: String? = recentId
@@ -273,6 +285,10 @@ class SessionViewModel(
                 if (live == null) return@collect
                 if (live.sessionId != sessionId) return@collect
                 rememberLive(live)
+                if (_state.value.forecast != null) {
+                    _state.update { it.withAnalysis() }
+                    return@collect
+                }
                 if (live.nodeId != session.tree.current.id) {
                     _state.update { it.withAnalysis() }
                     return@collect
@@ -335,6 +351,121 @@ class SessionViewModel(
         if (paused || !canPlace()) return
         if (point != null && session.position.stoneAt(point) != null) return
         _state.update { it.copy(selected = point, hover = null) }
+    }
+
+    fun onForecast(point: Point) {
+        if (paused || session.tree.ended || !session.reviewing) return
+        if (!analysis.status.value.online) return
+        if (Rules.tryPlay(session.position, point) !is PlayResult.Ok) return
+        cancelForecast()
+        cancelReviewQueue()
+        val epoch = navEpoch
+        val nodeId = session.tree.current.id
+        val start = session.position
+        _state.update {
+            it.copy(
+                forecast = Forecast(origin = point, nodeId = nodeId, plies = emptyList()),
+                forecastRevealed = 0,
+                aiError = null,
+            )
+        }
+        forecastJob = viewModelScope.launch {
+            try {
+                val response = analysis.queryForecast(sessionId, session.tree, point)
+                if (epoch != navEpoch || session.tree.current.id != nodeId) return@launch
+                val pv = response.moveInfos.minByOrNull { it.order }?.pv.orEmpty()
+                val built = buildForecastLine(start, point, pv)
+                if (built.plies.isEmpty()) {
+                    restoreAfterForecast()
+                    return@launch
+                }
+                val n = start.size * start.size
+                val afterLead = response.rootInfo?.let { toBlackView(it.winrate, it.scoreLead).scoreLead }
+                val parent = nodeEvals[nodeId]
+                val originLoss = forecastOriginLoss(
+                    originGtp = point.toGtp(start.size),
+                    toPlay = start.toPlay,
+                    parentMoveInfos = parent?.moveInfos.orEmpty(),
+                    parentBlackScoreLead = parent?.blackScoreLead ?: 0.0,
+                    afterBlackScoreLead = afterLead,
+                ).takeIf { parent != null && parent.hasView }
+                var forecast = Forecast(
+                    origin = point,
+                    nodeId = nodeId,
+                    plies = built.plies,
+                    originLoss = originLoss,
+                )
+                val arrivals = Channel<Int>(Channel.UNLIMITED)
+                fun applyOwnership(ply: Int, ownership: List<Double>) {
+                    if (ownership.size != n) return
+                    forecast = forecast.withPlyOwnership(ply, ownership)
+                    _state.update { state ->
+                        if (state.forecast?.origin != point || state.forecast?.nodeId != nodeId) {
+                            state
+                        } else {
+                            val showDead = showDeadStones.value
+                            val revealed = state.forecastRevealed
+                            state.copy(
+                                forecast = forecast,
+                                ownership = if (revealed == ply) ownership else state.ownership,
+                                deadPoints = if (revealed == ply && showDead) {
+                                    classifyDead(
+                                        session.position.cells,
+                                        start.size,
+                                        ownership,
+                                        emptySet(),
+                                        sameNode = false,
+                                    )
+                                } else {
+                                    state.deadPoints
+                                },
+                            )
+                        }
+                    }
+                    arrivals.trySend(ply)
+                }
+                if (response.ownership.size == n) applyOwnership(1, response.ownership)
+                revealForecastPly(forecast, 1)
+                var lastReveal = TimeSource.Monotonic.markNow()
+                val collectJob = launch {
+                    analysis.collectForecastOwnership(
+                        sessionId,
+                        session.tree,
+                        built.continuation,
+                    ) { ply, ownership ->
+                        applyOwnership(ply, ownership)
+                    }
+                }
+                try {
+                    for (ply in 2..built.plies.size) {
+                        val ready = withTimeoutOrNull(45_000) {
+                            while (!canRevealForecastPly(forecast, ply, n)) {
+                                arrivals.receive()
+                                if (epoch != navEpoch) return@withTimeoutOrNull false
+                            }
+                            true
+                        }
+                        if (ready != true) break
+                        val dropMs = settings.forecastDropMs.first()
+                        if (dropMs > 0) {
+                            val remaining = dropMs - lastReveal.elapsedNow().inWholeMilliseconds
+                            if (remaining > 0) delay(remaining)
+                        }
+                        if (epoch != navEpoch || session.tree.current.id != nodeId) return@launch
+                        revealForecastPly(forecast, ply)
+                        lastReveal = TimeSource.Monotonic.markNow()
+                    }
+                } finally {
+                    collectJob.cancel()
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (epoch != navEpoch) return@launch
+                restoreAfterForecast()
+                _state.update { it.copy(aiError = e.message?.take(160)) }
+            }
+        }
     }
 
     fun onActivate(point: Point, isTouch: Boolean) {
@@ -472,6 +603,7 @@ class SessionViewModel(
     }
 
     private fun publish() {
+        cancelForecast()
         val eval = nodeEvals[session.tree.current.id]
         _state.update {
             it.copy(
@@ -496,6 +628,8 @@ class SessionViewModel(
                 tree = session.tree.layout(),
                 dirty = computeDirty(),
                 canSave = boundId != null || hasContent() || seatsDirty(),
+                forecast = null,
+                forecastRevealed = 0,
             ).withAnalysis()
         }
         afterPositionChange()
@@ -513,6 +647,67 @@ class SessionViewModel(
     private fun bumpNav() {
         navEpoch++
         aiJob?.cancel()
+        cancelForecast()
+    }
+
+    private fun cancelForecast() {
+        forecastJob?.cancel()
+        forecastJob = null
+    }
+
+    fun endForecast() {
+        if (_state.value.forecast == null) return
+        restoreAfterForecast()
+    }
+
+    private fun restoreAfterForecast() {
+        cancelForecast()
+        val eval = nodeEvals[session.tree.current.id]
+        val size = session.tree.size
+        _state.update {
+            it.copy(
+                forecast = null,
+                forecastRevealed = 0,
+                ownership = heldOwnership(
+                    it.ownership,
+                    eval?.ownership ?: emptyList(),
+                    size,
+                ),
+                deadPoints = resolveDead(
+                    session.tree.current.id,
+                    eval?.ownership ?: emptyList(),
+                    eval?.visits ?: 0,
+                    emptySet(),
+                ),
+            )
+        }
+        if (!isAiToPlay()) requestLive()
+    }
+
+    private fun revealForecastPly(forecast: Forecast, ply: Int) {
+        val data = forecast.revealed(ply) ?: return
+        val size = session.tree.size
+        val showDead = showDeadStones.value
+        _state.update {
+            it.copy(
+                forecast = forecast,
+                forecastRevealed = ply,
+                ownership = if (data.ownership.size == size * size) data.ownership else it.ownership,
+                deadPoints = if (showDead && data.ownership.size == size * size) {
+                    classifyDead(
+                        session.position.cells,
+                        size,
+                        data.ownership,
+                        emptySet(),
+                        sameNode = false,
+                    )
+                } else if (showDead) {
+                    it.deadPoints
+                } else {
+                    emptySet()
+                },
+            )
+        }
     }
 
     private fun playAi() {
@@ -884,6 +1079,7 @@ class SessionViewModel(
     fun leave() {
         navEpoch++
         aiJob?.cancel()
+        cancelForecast()
         cancelReviewQueue()
         analysis.cancelLive(sessionId)
         flushBoundEvals()

@@ -12,6 +12,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.fillMaxSize
+import kotlinx.coroutines.withTimeoutOrNull
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -23,10 +24,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.PointerType
 import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
+import androidx.compose.ui.input.pointer.isSecondaryPressed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.TextStyle
@@ -36,6 +39,7 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.abs
+import com.acite.katahana.domain.Forecast
 import com.acite.katahana.domain.Point
 import com.acite.katahana.domain.SessionSnapshot
 import com.acite.katahana.domain.StoneColor
@@ -58,6 +62,7 @@ fun BoardCanvas(
     onHover: (Point?) -> Unit,
     onActivate: (Point, isTouch: Boolean) -> Unit,
     onAim: (Point?) -> Unit = {},
+    onForecast: (Point) -> Unit = {},
     modifier: Modifier = Modifier,
     candidates: List<Candidate> = emptyList(),
     qualities: List<QualityMark> = emptyList(),
@@ -66,6 +71,8 @@ fun BoardCanvas(
     showOwnership: Boolean = true,
     ownershipStyle: OwnershipStyle = OwnershipStyle.Blocks,
     deadPoints: Set<Point> = emptySet(),
+    forecast: Forecast? = null,
+    forecastRevealed: Int = 0,
 ) {
     val squash = remember { Animatable(1f) }
     val captureFlight = remember { Animatable(1f) }
@@ -212,7 +219,15 @@ fun BoardCanvas(
             .onGloballyPositioned { coords ->
                 boardInWindow.value = coords.localToWindow(Offset.Zero)
             }
-            .pointerInput(boardSize, showCoords, snapshot.ended, snapshot.aiToPlay, snapshot.moveNumber) {
+            .pointerInput(
+                boardSize,
+                showCoords,
+                snapshot.ended,
+                snapshot.aiToPlay,
+                snapshot.moveNumber,
+                snapshot.reviewing,
+            ) {
+                var secondaryDown = false
                 awaitPointerEventScope {
                     while (true) {
                         val event = awaitPointerEvent()
@@ -226,15 +241,25 @@ fun BoardCanvas(
                         )
                         val point = nearestIntersection(change.position, layout, TAP_MAX_GAPS)
                         when (event.type) {
+                            PointerEventType.Press -> {
+                                if (event.buttons.isSecondaryPressed) {
+                                    secondaryDown = true
+                                    change.consume()
+                                }
+                            }
                             PointerEventType.Move, PointerEventType.Enter -> {
                                 if (!snapshot.ended && !snapshot.aiToPlay) onHover(point)
                             }
                             PointerEventType.Exit -> onHover(null)
                             PointerEventType.Release -> {
-                                if (snapshot.ended || snapshot.aiToPlay) continue
-                                if (change.changedToUpIgnoreConsumed()) {
-                                    change.consume()
-                                    if (point != null) onActivate(point, false)
+                                val wasSecondary = secondaryDown
+                                secondaryDown = false
+                                if (!change.changedToUpIgnoreConsumed()) continue
+                                change.consume()
+                                if (wasSecondary) {
+                                    if (snapshot.reviewing && point != null) onForecast(point)
+                                } else if (!snapshot.ended && !snapshot.aiToPlay && point != null) {
+                                    onActivate(point, false)
                                 }
                             }
                             else -> Unit
@@ -242,7 +267,14 @@ fun BoardCanvas(
                     }
                 }
             }
-            .pointerInput(boardSize, showCoords, snapshot.ended, snapshot.aiToPlay, snapshot.moveNumber) {
+            .pointerInput(
+                boardSize,
+                showCoords,
+                snapshot.ended,
+                snapshot.aiToPlay,
+                snapshot.moveNumber,
+                snapshot.reviewing,
+            ) {
                 val edgePx = 24.dp.toPx()
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
@@ -260,6 +292,48 @@ fun BoardCanvas(
                     val start = down.position
                     var dragged = false
                     var lastAim: Point? = null
+                    if (snapshot.reviewing) {
+                        var slopAt: Offset? = null
+                        val finished = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis.toLong()) {
+                            while (true) {
+                                val event = awaitPointerEvent()
+                                val change = event.changes.firstOrNull { it.id == down.id }
+                                    ?: return@withTimeoutOrNull
+                                val travel = change.position - start
+                                if (change.changedToUpIgnoreConsumed()) {
+                                    val point = snap(change.position, TAP_MAX_GAPS)
+                                    if (point != null) onActivate(point, true)
+                                    return@withTimeoutOrNull
+                                }
+                                if (travel.getDistance() >= slop) {
+                                    slopAt = change.position
+                                    return@withTimeoutOrNull
+                                }
+                            }
+                        }
+                        if (finished == null && slopAt == null) {
+                            val origin = snap(down.position, TAP_MAX_GAPS)
+                            if (origin != null) onForecast(origin)
+                            while (true) {
+                                val event = awaitPointerEvent()
+                                val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                                change.consume()
+                                if (change.changedToUpIgnoreConsumed()) break
+                            }
+                            return@awaitEachGesture
+                        }
+                        val slopPos = slopAt ?: return@awaitEachGesture
+                        val travel = slopPos - start
+                        if (startedInEdge && abs(travel.x) > abs(travel.y) && travel.x > 0f) {
+                            return@awaitEachGesture
+                        }
+                        dragged = true
+                        val aimed = snap(slopPos, SLIDE_MAX_GAPS)
+                        if (aimed != null) {
+                            lastAim = aimed
+                            onAim(aimed)
+                        }
+                    }
                     while (true) {
                         val event = awaitPointerEvent()
                         val change = event.changes.firstOrNull { it.id == down.id } ?: break
@@ -366,6 +440,11 @@ fun BoardCanvas(
             }
         }
         val stoneR = layout.gap * 0.46f
+        val shownForecast = forecast?.revealed(forecastRevealed)
+        val captured = shownForecast?.captured.orEmpty()
+        val virtualStones = shownForecast?.stones.orEmpty()
+        val virtualPoints = virtualStones.map { it.point }.toHashSet()
+        val forecastLoading = forecast != null && forecastRevealed <= 0
         if (showConnections) {
             drawStoneLinks(
                 links = stoneLinks(snapshot),
@@ -381,17 +460,30 @@ fun BoardCanvas(
                 val color = snapshot.stoneAt(x, y) ?: continue
                 val p = Point(x, y)
                 val squashY = if (p == snapshot.lastMove) squash.value else 1f
-                val alpha = if (p in deadPoints) 0.40f else 1f
+                val alpha = when {
+                    p in captured -> 0.35f
+                    p in deadPoints -> 0.40f
+                    else -> 1f
+                }
                 drawStone(color, appearance, layout.center(p), stoneR, squashY = squashY, alpha = alpha)
+                if (p in captured) {
+                    drawForecastCaptureMark(
+                        layout.center(p),
+                        stoneR,
+                        appearance.swatch(color).light,
+                    )
+                }
             }
         }
         for (mark in qualities) {
             if (mark.point in deadPoints) continue
+            if (mark.point in captured || mark.point in virtualPoints) continue
             val onBoard = snapshot.stoneAt(mark.point.x, mark.point.y)
             if (onBoard != mark.color) continue
             drawQualityFace(layout.center(mark.point), stoneR, mark.band)
         }
         for (point in deadPoints) {
+            if (point in captured || point in virtualPoints) continue
             if (snapshot.stoneAt(point.x, point.y) == null) continue
             drawDeadFace(layout.center(point), stoneR)
         }
@@ -428,6 +520,7 @@ fun BoardCanvas(
         }
         candidates.forEach { candidate ->
             val point = candidate.point ?: return@forEach
+            if (point in virtualPoints) return@forEach
             if (snapshot.stoneAt(point.x, point.y) != null) return@forEach
             val tightness = (1.0 - (candidate.pointsLost / 1.5).coerceIn(0.0, 1.0)).toFloat()
             val radius = stoneR * (0.58f + 0.20f * tightness)
@@ -444,9 +537,47 @@ fun BoardCanvas(
             preview != null &&
             !snapshot.ended &&
             !snapshot.aiToPlay &&
+            preview !in virtualPoints &&
+            !(forecastLoading && preview == forecast?.origin) &&
             snapshot.stoneAt(preview.x, preview.y) == null
         ) {
             drawStone(snapshot.toPlay, appearance, layout.center(preview), stoneR, alpha = 0.42f)
+        }
+        if (forecastLoading) {
+            forecast?.let { drawForecastLoading(layout.center(it.origin), stoneR, lastBreath.value) }
+        }
+        val plyStyleBase = (stoneR * 0.72f).coerceIn(11f, 18f).sp
+        val originLoss = forecast?.originLoss
+        for (stone in virtualStones) {
+            val swatch = appearance.swatch(stone.color)
+            val isOrigin = stone.ply == 1
+            val labelColor = if (swatch.light) Color(0xFF1A1228) else Color.White
+            val text = if (isOrigin && originLoss != null) {
+                formatScoreLoss(originLoss)
+            } else {
+                stone.ply.toString()
+            }
+            val fontSize = if (isOrigin && originLoss != null) {
+                (stoneR * 0.48f).coerceIn(9f, 13f).sp
+            } else {
+                plyStyleBase
+            }
+            val label = measurer.measure(
+                text,
+                TextStyle(
+                    color = labelColor,
+                    fontSize = fontSize,
+                    fontWeight = FontWeight.Bold,
+                ),
+            )
+            drawForecastStone(
+                color = stone.color,
+                appearance = appearance,
+                center = layout.center(stone.point),
+                radius = stoneR,
+                label = label,
+                origin = isOrigin,
+            )
         }
     }
 }

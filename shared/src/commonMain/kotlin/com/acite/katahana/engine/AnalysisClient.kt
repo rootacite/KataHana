@@ -2,7 +2,9 @@ package com.acite.katahana.engine
 
 import com.acite.katahana.ai.HumanBot
 import com.acite.katahana.domain.GameTree
+import com.acite.katahana.domain.Move
 import com.acite.katahana.domain.Node
+import com.acite.katahana.domain.Point
 import com.acite.katahana.domain.StoneColor
 import com.acite.katahana.settings.SettingsRepository
 import dev.zacsweers.metro.AppScope
@@ -38,7 +40,7 @@ class AnalysisClient(
     private val ws = WsClient()
     private val waitersMutex = Mutex()
     private val sendMutex = Mutex()
-    private val waiters = mutableMapOf<String, CompletableDeferred<AnalysisResponse>>()
+    private val waiters = mutableMapOf<String, QueryWaiter>()
 
     private val _status = MutableStateFlow(EngineStatus())
     val status: StateFlow<EngineStatus> = _status.asStateFlow()
@@ -179,6 +181,71 @@ class AnalysisClient(
         return response
     }
 
+    suspend fun queryForecast(sessionId: String, tree: GameTree, origin: Point): AnalysisResponse {
+        val nonce = Random.nextLong().toULong().toString(16)
+        val nodeId = tree.current.id
+        val query = buildForecastQuery(
+            sessionId,
+            nodeId,
+            nonce,
+            tree,
+            origin,
+            currentProfile.reviewVisits,
+        )
+        val response = sendAndAwaitFinal(
+            query,
+            InFlight(
+                query.id,
+                sessionId,
+                nodeId,
+                tree.size,
+                tree.current.position.toPlay,
+                publishLive = false,
+            ),
+        )
+        if (response.error != null) error(response.error)
+        return response
+    }
+
+    suspend fun collectForecastOwnership(
+        sessionId: String,
+        tree: GameTree,
+        continuation: List<Move>,
+        onTurn: (ply: Int, ownership: List<Double>) -> Unit,
+    ) {
+        if (continuation.size <= 1) return
+        val nonce = Random.nextLong().toULong().toString(16)
+        val nodeId = tree.current.id
+        val query = buildForecastOwnershipQuery(
+            sessionId,
+            nodeId,
+            nonce,
+            tree,
+            continuation,
+            currentProfile.reviewVisits,
+        )
+        val expected = query.analyzeTurns.orEmpty().toSet()
+        if (expected.isEmpty()) return
+        val pathLen = tree.lineMoves().size
+        collectTurns(
+            query,
+            InFlight(
+                query.id,
+                sessionId,
+                nodeId,
+                tree.size,
+                tree.current.position.toPlay,
+                publishLive = false,
+            ),
+            expected,
+        ) { turn, response ->
+            val ply = turn - pathLen
+            if (ply >= 1 && response.ownership.isNotEmpty()) {
+                onTurn(ply, response.ownership)
+            }
+        }
+    }
+
     suspend fun queryGenmove(sessionId: String, tree: GameTree): AnalysisResponse {
         val nonce = Random.nextLong().toULong().toString(16)
         val nodeId = tree.current.id
@@ -199,7 +266,7 @@ class AnalysisClient(
 
     private suspend fun sendAndAwaitFinal(query: AnalysisQuery, flight: InFlight): AnalysisResponse {
         val deferred = CompletableDeferred<AnalysisResponse>()
-        waitersMutex.withLock { waiters[query.id] = deferred }
+        waitersMutex.withLock { waiters[query.id] = QueryWaiter.OneShot(deferred) }
         try {
             awaitOnline()
             sendMutex.withLock {
@@ -210,13 +277,57 @@ class AnalysisClient(
             }
             return withTimeout(60_000) { deferred.await() }
         } finally {
-            waitersMutex.withLock { waiters.remove(query.id) }
-            if (inFlight?.queryId == query.id) {
-                inFlight = null
-                if (_status.value.phase == EnginePhase.Analyzing) {
-                    _status.value = EngineStatus(EnginePhase.Ready)
+            finishQuery(query.id)
+        }
+    }
+
+    private suspend fun collectTurns(
+        query: AnalysisQuery,
+        flight: InFlight,
+        expectedTurns: Set<Int>,
+        onTurn: (turn: Int, response: AnalysisResponse) -> Unit,
+    ) {
+        val channel = Channel<AnalysisResponse>(Channel.UNLIMITED)
+        waitersMutex.withLock { waiters[query.id] = QueryWaiter.Stream(channel) }
+        try {
+            awaitOnline()
+            sendMutex.withLock {
+                terminateLive()
+                inFlight = flight
+                _status.value = EngineStatus(EnginePhase.Analyzing)
+                sendJson(analysisJson.encodeToString(AnalysisQuery.serializer(), query))
+            }
+            val got = HashSet<Int>()
+            val timeoutMs = 60_000L + 8_000L * expectedTurns.size
+            withTimeout(timeoutMs) {
+                while (got.size < expectedTurns.size) {
+                    val response = channel.receive()
+                    if (response.error != null) error(response.error)
+                    val turn = response.turnNumber ?: continue
+                    if (turn in expectedTurns && got.add(turn)) {
+                        onTurn(turn, response)
+                    }
                 }
             }
+        } finally {
+            channel.close()
+            finishQuery(query.id)
+        }
+    }
+
+    private suspend fun finishQuery(queryId: String) {
+        waitersMutex.withLock { waiters.remove(queryId) }
+        if (inFlight?.queryId != queryId) return
+        val nonce = Random.nextLong().toULong().toString(16)
+        inFlight = null
+        sendJson(
+            analysisJson.encodeToString(
+                TerminateQuery.serializer(),
+                TerminateQuery(id = "term:$nonce", terminateId = queryId),
+            ),
+        )
+        if (_status.value.phase == EnginePhase.Analyzing) {
+            _status.value = EngineStatus(EnginePhase.Ready)
         }
     }
 
@@ -328,7 +439,7 @@ class AnalysisClient(
         if (profile.url.isBlank()) return TestResult.Fail("Set a WebSocket URL first.")
         val id = "test:${Random.nextLong().toULong().toString(16)}"
         val deferred = CompletableDeferred<AnalysisResponse>()
-        waitersMutex.withLock { waiters[id] = deferred }
+        waitersMutex.withLock { waiters[id] = QueryWaiter.OneShot(deferred) }
         try {
             awaitOnline()
             sendJson(analysisJson.encodeToString(AnalysisQuery.serializer(), buildTestQuery(id)))
@@ -350,7 +461,7 @@ class AnalysisClient(
 
     private suspend fun queryOnce(query: AnalysisQuery, timeoutMs: Long): AnalysisResponse {
         val deferred = CompletableDeferred<AnalysisResponse>()
-        waitersMutex.withLock { waiters[query.id] = deferred }
+        waitersMutex.withLock { waiters[query.id] = QueryWaiter.OneShot(deferred) }
         try {
             awaitOnline()
             sendMutex.withLock {
@@ -422,8 +533,11 @@ class AnalysisClient(
         }
         val id = response.id
         if (id != null && (!response.isDuringSearch || response.error != null)) {
-            val waiter = waitersMutex.withLock { waiters[id] }
-            waiter?.complete(response)
+            when (val waiter = waitersMutex.withLock { waiters[id] }) {
+                is QueryWaiter.OneShot -> waiter.deferred.complete(response)
+                is QueryWaiter.Stream -> waiter.channel.trySend(response)
+                null -> Unit
+            }
         }
         if (response.action != null && response.rootInfo == null) return
         val flight = inFlight ?: return
@@ -432,6 +546,7 @@ class AnalysisClient(
             _status.value = EngineStatus(EnginePhase.Ready, response.error)
             return
         }
+        if (!flight.publishLive) return
         val root = response.rootInfo ?: return
         val view = toBlackView(root.winrate, root.scoreLead)
         _live.value = LiveAnalysis(
@@ -462,5 +577,11 @@ class AnalysisClient(
         val nodeId: String,
         val boardSize: Int,
         val toPlay: StoneColor,
+        val publishLive: Boolean = true,
     )
+
+    private sealed class QueryWaiter {
+        class OneShot(val deferred: CompletableDeferred<AnalysisResponse>) : QueryWaiter()
+        class Stream(val channel: Channel<AnalysisResponse>) : QueryWaiter()
+    }
 }
