@@ -56,6 +56,7 @@ import com.acite.katahana.recents.defaultRecentTitle
 import com.acite.katahana.recents.seatSgfName
 import com.acite.katahana.recents.toRecentAiStyle
 import com.acite.katahana.recents.toRecentMode
+import com.acite.katahana.settings.AnalysisLayoutMode
 import com.acite.katahana.settings.OwnershipStyle
 import com.acite.katahana.settings.QualityThresholds
 import com.acite.katahana.settings.SettingsRepository
@@ -212,6 +213,11 @@ class SessionViewModel(
         viewModelScope,
         SharingStarted.WhileSubscribed(1_000),
         0.55f,
+    )
+    val analysisLayoutMode: StateFlow<AnalysisLayoutMode> = settings.analysisLayoutMode.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(1_000),
+        AnalysisLayoutMode.Default,
     )
     val quality: StateFlow<QualityThresholds> = settings.quality.stateIn(
         viewModelScope,

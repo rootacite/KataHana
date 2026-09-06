@@ -24,7 +24,7 @@ DataStore。**所有设置都以“Flow + setter”成对出现**，UI/VM 用
 | 组 | 键（示例） | 说明 |
 | --- | --- | --- |
 | 显示开关 | `show_coords / show_candidates / show_quality / show_connections / show_ownership / show_dead_stones`、`confirm_move` | 棋盘显示与“确认落子” |
-| 外观 | `appearance`（默认 `sky_sakura`）、`drawer_acrylic`（浮点）、`ownership_style` | 主题与抽屉模糊度 |
+| 外观 | `appearance`（默认 `sky_sakura`）、`drawer_acrylic`（浮点）、`ownership_style`、`analysis_layout`（`auto` / `compact` / `expanded`） | 主题、抽屉模糊度、窄屏分析面板（三栏或 Tab） |
 | 引擎 | `engine_name / engine_url / engine_token`、`play_visits`(400)、`review_visits`(400)、`forecast_drop_ms`(400，上限 3000) | 连接与访问量预算 |
 | 质量阈值 | `quality_blunder/big/mistake/inacc/fair`（12/6/3/1.5/0.5） | 复盘“损失目数→档位”分界，封装成 `QualityThresholds` |
 | 上次对局 | `last_*`（尺寸/贴目/模式/段级/执黑/风格 + 双座位 kind 与段级） | Home 新对局弹层默认值 |

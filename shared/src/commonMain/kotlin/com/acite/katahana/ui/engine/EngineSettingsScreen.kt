@@ -49,6 +49,7 @@ import com.acite.katahana.ui.components.ScreenHeader
 import com.acite.katahana.ui.session.engineStatusLabel
 import com.acite.katahana.ui.settings.SettingsViewModel
 import com.acite.katahana.ui.theme.hanaColors
+import com.acite.katahana.ui.theme.hanaFontFamily
 import dev.zacsweers.metrox.viewmodel.metroViewModel
 
 class EngineSettingsScreen : Screen {
@@ -228,15 +229,18 @@ private fun HardwareScoreBar(score: Float) {
     val t = (score / 100f).coerceIn(0f, 1f)
     val colors = hanaColors
     val measurer = rememberTextMeasurer()
+    val fonts = hanaFontFamily
     val hereStyle = TextStyle(
         color = colors.accentPink,
         fontSize = 11.sp,
         fontWeight = FontWeight.SemiBold,
+        fontFamily = fonts,
     )
     val tickStyle = TextStyle(
         color = colors.textDim,
         fontSize = 10.sp,
         fontWeight = FontWeight.Medium,
+        fontFamily = fonts,
     )
     Canvas(
         Modifier

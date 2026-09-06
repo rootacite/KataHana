@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.sp
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
+import com.acite.katahana.settings.AnalysisLayoutMode
 import com.acite.katahana.settings.FORECAST_DROP_MS_MAX
 import com.acite.katahana.settings.OwnershipStyle
 import com.acite.katahana.ui.Copy
@@ -71,6 +72,7 @@ private fun SettingsRoute(vm: SettingsViewModel) {
     val confirm by vm.confirmMove.collectAsState()
     val coords by vm.showCoords.collectAsState()
     val appearanceId by vm.appearanceId.collectAsState()
+    val analysisLayoutMode by vm.analysisLayoutMode.collectAsState()
     val ownershipStyle by vm.ownershipStyle.collectAsState()
     val quality by vm.quality.collectAsState()
     val acrylic by vm.drawerAcrylic.collectAsState()
@@ -95,6 +97,17 @@ private fun SettingsRoute(vm: SettingsViewModel) {
                     Column(Modifier.weight(1f)) {
                         Text(appearance.label, color = hanaColors.text, fontSize = 15.sp)
                         Text(appearance.blurb, color = hanaColors.textDim, fontSize = 12.sp)
+                    }
+                }
+            }
+        }
+        HanaSection(Copy.analysisLayout, hazeState, hint = Copy.analysisLayoutHint) {
+            AnalysisLayoutMode.entries.forEach { mode ->
+                val selected = mode == analysisLayoutMode
+                HanaChoiceRow(selected = selected, onClick = { vm.setAnalysisLayoutMode(mode) }) {
+                    Column(Modifier.weight(1f)) {
+                        Text(analysisLayoutTitle(mode), color = hanaColors.text, fontSize = 15.sp)
+                        Text(analysisLayoutBlurb(mode), color = hanaColors.textDim, fontSize = 12.sp)
                     }
                 }
             }
@@ -174,6 +187,18 @@ private fun SettingsRoute(vm: SettingsViewModel) {
         Spacer(Modifier.height(8.dp))
     }
     }
+}
+
+private fun analysisLayoutTitle(mode: AnalysisLayoutMode): String = when (mode) {
+    AnalysisLayoutMode.Auto -> Copy.analysisLayoutAuto
+    AnalysisLayoutMode.Compact -> Copy.analysisLayoutCompact
+    AnalysisLayoutMode.Expanded -> Copy.analysisLayoutExpanded
+}
+
+private fun analysisLayoutBlurb(mode: AnalysisLayoutMode): String = when (mode) {
+    AnalysisLayoutMode.Auto -> Copy.analysisLayoutAutoHint
+    AnalysisLayoutMode.Compact -> Copy.analysisLayoutCompactHint
+    AnalysisLayoutMode.Expanded -> Copy.analysisLayoutExpandedHint
 }
 
 private fun styleTitle(style: OwnershipStyle): String = when (style) {

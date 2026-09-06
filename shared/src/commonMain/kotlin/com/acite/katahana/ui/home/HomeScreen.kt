@@ -187,7 +187,7 @@ private fun HomeRail(
         PorcelainCard(hazeState) { BrandMark() }
         PorcelainCard(hazeState, title = Copy.play) {
             HomeNavTile(Copy.hvh, onHuman, modifier = Modifier.fillMaxWidth(), accent = hanaColors.accentPink, emphasized = true)
-            HomeNavTile(Copy.humanVsKatago, onKatago, modifier = Modifier.fillMaxWidth(), accent = hanaColors.accentBlue, emphasized = true)
+            HomeNavTile(Copy.hvai, onKatago, modifier = Modifier.fillMaxWidth(), accent = hanaColors.accentBlue, emphasized = true)
             HomeNavTile(Copy.loadGame, onLoad, modifier = Modifier.fillMaxWidth(), accent = hanaColors.accentLilac)
         }
         PorcelainCard(hazeState, title = Copy.app) {
@@ -212,7 +212,7 @@ private fun HomeActionGrid(
         PorcelainCard(hazeState, title = Copy.play) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 HomeNavTile(Copy.hvh, onHuman, Modifier.weight(1f), hanaColors.accentPink, emphasized = true)
-                HomeNavTile(Copy.humanVsKatago, onKatago, Modifier.weight(1f), hanaColors.accentBlue, emphasized = true)
+                HomeNavTile(Copy.hvai, onKatago, Modifier.weight(1f), hanaColors.accentBlue, emphasized = true)
             }
             HomeNavTile(Copy.loadGame, onLoad, Modifier.fillMaxWidth(), hanaColors.accentLilac)
         }

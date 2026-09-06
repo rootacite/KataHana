@@ -39,7 +39,10 @@ FadeTransition 时会把已 DESTROYED 的屏幕再试图切到 STARTED 而崩溃
 布局决策收敛在一个纯函数里：
 
 ```kotlin
-internal fun computeSessionLayout(maxWidth, maxHeight, mobile, chromePad): SessionLayout
+internal fun computeSessionLayout(
+    maxWidth, maxHeight, mobile, chromePad,
+    analysisMode = AnalysisLayoutMode.Auto,
+): SessionLayout
 ```
 
 规则（常量在 `SessionLayout.kt`）：
@@ -50,13 +53,22 @@ internal fun computeSessionLayout(maxWidth, maxHeight, mobile, chromePad): Sessi
 - **横屏/宽屏**：棋盘右侧富余宽度 ≥ 168dp 就放侧边三栏
   （`showSideTree`，宽度 clamp 在 168–280dp）；
 - **纵屏**（宽 ≤ 高）：棋盘上方富余高度 ≥ 200dp 时放顶部一行
-  （`showTopTree`）——从高到低依次是 Winrate 条、常驻三栏
-  （Game Tree / Score·Winrate 曲线 / Move quality）、棋盘在底部；
+  （`showTopTree`）——从高到低依次是 Winrate 条、分析区、棋盘在底部；
 - 都不满足就只有棋盘。
 
-纵屏顶行与横屏侧栏复用同一批“卡”：`GameTreeCard`（棋树面板）、`EvalGraphCard`
-（胜负曲线）、`QualityStatsCard`（质量统计）；它们由 `EvalGraph.kt` /
-`GameTreeView.kt` 里的 `SessionTreeRow` / `SessionTreeColumn` 组织。顶栏
+分析区默认是三张独立瓷器卡：`GameTreeCard` / `EvalGraphCard` / `QualityStatsCard`
+（纵屏横排、横屏竖叠）。窗口太窄或太矮时，三栏会换行或把中间的 Score 图挤没，
+于是 `tabbedAnalysis` 把三张卡合成**一张**瓷器，顶上三个胶囊 Tab
+（Game tree / Score / Quality）切换。Auto 启发式看**当前窗口**而不是机型：
+
+- 纵屏：`maxWidth < 560.dp`；
+- 横屏：侧栏高度（≈ `boardSide`）`< 420.dp`，或侧栏宽 `< 240.dp`。
+
+设置里 `AnalysisLayoutMode`（Auto / Compact=强制 Tab / Expanded=强制三栏）可覆盖
+误判。抽屉 `SidePanel` 仍是三张独立卡，不要改它的信息架构。
+
+纵屏顶行与横屏侧栏由 `EvalGraph.kt` / `GameTreeView.kt` 里的
+`SessionTreeRow` / `SessionTreeColumn` 组织。顶栏
 （纵屏 `SessionTopBar`）与侧 rail（横屏 `SessionRail`）放引擎状态点、菜单、
 `WinrateTrack`（胜负条）、`PlayIconCluster`（附加按钮 Resume / EndPreview / 确认
 在前，Pass/Undo/Redo 固定贴在簇的尾沿，避免 Undo 后出现的按钮把常驻三键挤开）
@@ -75,7 +87,8 @@ internal fun computeSessionLayout(maxWidth, maxHeight, mobile, chromePad): Sessi
 2. 势力图层（`Overlays.drawOwnershipLayer`：三种风格
    `Blocks`（逐点方块）/ `Fog`（8×8 双线性场雾）/ `Constellation`（星丛连线），
    各带独立无限动画与透明度）；
-3. 星位 → GTP 坐标带；
+3. 星位 → GTP 坐标带（字号 = `gap * 0.48` 像素再 `toSp()`，粗体，落在外侧
+   `0.58` 格的标签带里；字形宽超过格距 0.9 时只画偶数路与两端，避免窄屏字母重叠）；
 4. **棋子下方的连接形状**（`Connections.kt`：长连/小尖/飞/跳，虚线、二次曲线带
    “外靠”偏移，随上一步的落子有生长动画）——名字就说明它是垫在棋子下面的；
 5. 真实棋子（`Stones.drawStone`：径向渐变 + 高光 + 描边；落子有 squash 弹簧、
@@ -86,7 +99,9 @@ internal fun computeSessionLayout(maxWidth, maxHeight, mobile, chromePad): Sessi
 9. 局势预测：加载圈 + 编号虚子（透明棋子 + 手数/损失标签）。
 
 棋子之上的交互全部经**命中测试** `BoardHit.kt` 把指针位置换算成交点：
-`BoardLayout` 先算棋盘正方形、边距与格距，`nearestIntersection` 找最近的格点，
+`BoardLayout` 先算棋盘正方形、边距与格距：木边是 `0.75` 格（刚过子半径
+`0.46`），开坐标时再加 `0.58` 格的标签带，标签画在这条带的中线，不要按棋盘
+边长百分比留白。`nearestIntersection` 找最近的格点，
 距离超过阈值就视为点空（点击 `.62` 格、滑动 `.85` 格）。两条指针管线分开实现：
 
 - **鼠标**：悬停出幽灵子（`onHover`），按下抬起 = 落子
@@ -116,10 +131,16 @@ blurb, tagline, first, second, palette)`，其中 `first/second` 是一对
 `HanaPalette`（`Color.kt`）是整套 UI 色板：`bgApp / bgPanel / bgCard / stroke /
 text / textDim / accentPink / accentBlue / accentLilac / boardBg / grid / star`，
 外加六个**跨外观共享**的语义色 `qualityPurple/Red/Orange/Yellow/Mint/Green`。
-`KataHanaTheme(appearance)` 用 palette 构造一个 M3 `darkColorScheme`，并通过三个
+`KataHanaTheme(appearance)` 用 palette 构造一个 M3 `darkColorScheme`，并通过四个
 `staticCompositionLocalOf` 提供 `LocalHanaPalette`（→ `hanaColors`）、
-`LocalHanaTokens`（圆角/动效 token）、`LocalAppearance`。composable 里读
-`hanaColors` 即可拿到“当前外观”的颜色；非 composable 语境（如 Type.kt）用静态
+`LocalHanaTokens`（圆角/动效 token）、`LocalAppearance`、`LocalHanaFontFamily`
+（Nunito Regular/Medium/SemiBold/Bold，OFL，文件在
+`composeResources/font/`）。`hanaTypography(fontFamily)` 把字族写进 M3
+`Typography`；Compose `Text` 会继承。Canvas 里手写的 `TextStyle`（棋盘坐标、
+胜负图轴、候选点数字）必须显式带上 `hanaFontFamily`，否则仍走平台默认。
+棋盘坐标的字号按 **Canvas 像素格距** 再 `toSp()`，不要把像素当成 `sp`
+（高密度窄屏上会比格距还大、字母叠在一起）。composable 里读
+`hanaColors` 即可拿到“当前外观”的颜色；非 composable 语境用静态
 `HanaColors`（SkySakura 默认值）。
 
 **颜色纪律**（务必遵守）：

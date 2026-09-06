@@ -11,7 +11,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -37,57 +39,70 @@ fun QualityStatsCard(
     stats: QualityStats,
     modifier: Modifier = Modifier,
     compact: Boolean = false,
+    framed: Boolean = true,
 ) {
     val appearance = hanaAppearance
     val colors = hanaColors
-    FrostedSurface(modifier) {
-        Column(Modifier.padding(if (compact) 10.dp else 14.dp)) {
-        Text(
-            Copy.moveQuality,
-            color = colors.text,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.SemiBold,
-        )
-        Spacer(Modifier.height(8.dp))
-        Row(
-            Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
+    val body: @Composable () -> Unit = {
+        Column(
+            Modifier
+                .then(if (!framed) Modifier.verticalScroll(rememberScrollState()) else Modifier)
+                .padding(if (compact && framed) 10.dp else if (framed) 14.dp else 0.dp),
         ) {
-            Spacer(Modifier.weight(1f))
-            SideHead(appearance.first.fill, Copy.black)
-            Spacer(Modifier.width(8.dp))
-            SideHead(appearance.second.fill, Copy.white)
-        }
-        Spacer(Modifier.height(6.dp))
-        STAT_BANDS.forEach { band ->
-            val black = stats.count(StoneColor.Black, band)
-            val white = stats.count(StoneColor.White, band)
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 2.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Box(
-                    Modifier
-                        .size(8.dp)
-                        .clip(CircleShape)
-                        .background(qualityDotColor(band, colors.accentLilac)),
-                )
-                Spacer(Modifier.width(8.dp))
+            if (framed) {
                 Text(
-                    bandLabel(band),
+                    Copy.moveQuality,
                     color = colors.text,
-                    fontSize = 12.sp,
-                    modifier = Modifier.weight(1f),
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                 )
-                CountCell(black)
+                Spacer(Modifier.height(8.dp))
+            }
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Spacer(Modifier.weight(1f))
+                SideHead(appearance.first.fill, Copy.black)
                 Spacer(Modifier.width(8.dp))
-                CountCell(white)
+                SideHead(appearance.second.fill, Copy.white)
+            }
+            Spacer(Modifier.height(6.dp))
+            STAT_BANDS.forEach { band ->
+                val black = stats.count(StoneColor.Black, band)
+                val white = stats.count(StoneColor.White, band)
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(
+                        Modifier
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(qualityDotColor(band, colors.accentLilac)),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        bandLabel(band),
+                        color = colors.text,
+                        fontSize = 12.sp,
+                        modifier = Modifier.weight(1f),
+                        maxLines = 1,
+                    )
+                    CountCell(black)
+                    Spacer(Modifier.width(8.dp))
+                    CountCell(white)
+                }
             }
         }
-        }
+    }
+    if (framed) {
+        FrostedSurface(modifier) { body() }
+    } else {
+        Box(modifier) { body() }
     }
 }
 

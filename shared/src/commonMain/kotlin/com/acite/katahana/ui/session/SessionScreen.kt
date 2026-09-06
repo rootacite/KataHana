@@ -107,6 +107,7 @@ private fun SessionRoute(vm: SessionViewModel) {
     val showDeadStones by vm.showDeadStones.collectAsState()
     val ownershipStyle by vm.ownershipStyle.collectAsState()
     val drawerAcrylic by vm.drawerAcrylic.collectAsState()
+    val analysisLayoutMode by vm.analysisLayoutMode.collectAsState()
     val navigator = LocalNavigator.currentOrThrow
     val snapshot = ui.snapshot
     val boardCandidates = if (showCandidates) ui.candidates else emptyList()
@@ -268,6 +269,7 @@ private fun SessionRoute(vm: SessionViewModel) {
                         maxHeight = maxHeight,
                         mobile = getPlatform().isMobile,
                         chromePad = chromePad,
+                        analysisMode = analysisLayoutMode,
                     )
                     val board: @Composable () -> Unit = {
                         BoardCanvas(
@@ -302,6 +304,7 @@ private fun SessionRoute(vm: SessionViewModel) {
                                     graphMode = ui.evalGraphMode,
                                     onGraphMode = vm::setEvalGraphMode,
                                     stats = ui.qualityStats,
+                                    tabbed = layout.tabbedAnalysis,
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .height(layout.treeH),
@@ -330,6 +333,7 @@ private fun SessionRoute(vm: SessionViewModel) {
                                         graphMode = ui.evalGraphMode,
                                         onGraphMode = vm::setEvalGraphMode,
                                         stats = ui.qualityStats,
+                                        tabbed = layout.tabbedAnalysis,
                                         modifier = Modifier
                                             .width(layout.treeW)
                                             .fillMaxHeight(),

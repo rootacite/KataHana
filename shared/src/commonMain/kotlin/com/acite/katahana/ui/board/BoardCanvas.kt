@@ -53,6 +53,7 @@ import com.acite.katahana.settings.OwnershipStyle
 import com.acite.katahana.ui.theme.HanaMotion
 import com.acite.katahana.ui.theme.hanaAppearance
 import com.acite.katahana.ui.theme.hanaColors
+import com.acite.katahana.ui.theme.hanaFontFamily
 
 @Composable
 fun BoardCanvas(
@@ -196,6 +197,7 @@ fun BoardCanvas(
     val boardSize = snapshot.size
     val appearance = hanaAppearance
     val colors = hanaColors
+    val fonts = hanaFontFamily
     val boardInWindow = remember { mutableStateOf(Offset.Zero) }
     val ownershipMorph = remember { OwnershipMorph() }
     val morph = remember { Animatable(1f) }
@@ -368,11 +370,12 @@ fun BoardCanvas(
             },
     ) {
         val layout = BoardLayout(this.size.width, this.size.height, boardSize, showCoords)
+        val boardCorner = (layout.gap * 0.22f).coerceIn(6.dp.toPx(), 10.dp.toPx())
         drawRoundRect(
             color = colors.boardBg,
             topLeft = Offset(layout.originX, layout.originY),
             size = Size(layout.side, layout.side),
-            cornerRadius = CornerRadius(22.dp.toPx(), 22.dp.toPx()),
+            cornerRadius = CornerRadius(boardCorner, boardCorner),
         )
         val gridColor = colors.grid.copy(alpha = 0.45f)
         val stroke = (1.2.dp.toPx()).coerceAtLeast(1f)
@@ -424,19 +427,32 @@ fun BoardCanvas(
         if (showCoords) {
             val style = TextStyle(
                 color = colors.textDim,
-                fontSize = (layout.gap * 0.42f).coerceIn(13f, 18f).sp,
+                fontSize = coordFontPx(layout.gap).toSp(),
+                fontFamily = fonts,
+                fontWeight = FontWeight.Bold,
             )
             val letters = gtpLetters(boardSize)
-            val topBand = (layout.originY + layout.yOf(0)) / 2f
-            val botBand = (layout.yOf(boardSize - 1) + layout.originY + layout.side) / 2f
-            val leftBand = (layout.originX + layout.xOf(0)) / 2f
-            val rightBand = (layout.xOf(boardSize - 1) + layout.originX + layout.side) / 2f
+            val topBand = layout.originY + layout.coordBand * 0.5f
+            val botBand = layout.originY + layout.side - layout.coordBand * 0.5f
+            val leftBand = layout.originX + layout.coordBand * 0.5f
+            val rightBand = layout.originX + layout.side - layout.coordBand * 0.5f
+            var widest = 0
+            val measuredLetters = Array(boardSize) { i ->
+                measurer.measure(letters[i], style).also { widest = maxOf(widest, it.size.width) }
+            }
+            val measuredNumbers = Array(boardSize) { i ->
+                measurer.measure((boardSize - i).toString(), style).also {
+                    widest = maxOf(widest, it.size.width)
+                }
+            }
+            val thin = coordsNeedThinning(widest.toFloat(), layout.gap)
             for (i in 0 until boardSize) {
-                val letter = measurer.measure(letters[i], style)
+                if (!shouldDrawCoordIndex(i, boardSize, thin)) continue
+                val letter = measuredLetters[i]
                 val lx = layout.xOf(i) - letter.size.width / 2f
                 drawText(letter, topLeft = Offset(lx, topBand - letter.size.height / 2f))
                 drawText(letter, topLeft = Offset(lx, botBand - letter.size.height / 2f))
-                val number = measurer.measure((boardSize - i).toString(), style)
+                val number = measuredNumbers[i]
                 val ny = layout.yOf(i) - number.size.height / 2f
                 drawText(number, topLeft = Offset(leftBand - number.size.width / 2f, ny))
                 drawText(number, topLeft = Offset(rightBand - number.size.width / 2f, ny))
@@ -532,6 +548,7 @@ fun BoardCanvas(
                 color = candidateLabelColor(candidate.pointsLost),
                 fontSize = 10.sp,
                 fontWeight = FontWeight.Bold,
+                fontFamily = fonts,
             )
             val label = measurer.measure(formatScoreLoss(candidate.pointsLost), labelStyle)
             drawCandidate(layout.center(point), radius, fill, label)
@@ -556,7 +573,7 @@ fun BoardCanvas(
                 )
             }
         }
-        val plyStyleBase = (stoneR * 0.72f).coerceIn(11f, 18f).sp
+        val plyStyleBase = (stoneR * 0.72f).toSp()
         val originLoss = forecast?.originLoss
         for (stone in virtualStones) {
             val swatch = appearance.swatch(stone.color)
@@ -568,7 +585,7 @@ fun BoardCanvas(
                 stone.ply.toString()
             }
             val fontSize = if (isOrigin && originLoss != null) {
-                (stoneR * 0.48f).coerceIn(9f, 13f).sp
+                (stoneR * 0.48f).toSp()
             } else {
                 plyStyleBase
             }
@@ -578,6 +595,7 @@ fun BoardCanvas(
                     color = labelColor,
                     fontSize = fontSize,
                     fontWeight = FontWeight.Bold,
+                    fontFamily = fonts,
                 ),
             )
             drawForecastStone(

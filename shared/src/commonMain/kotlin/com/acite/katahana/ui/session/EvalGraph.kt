@@ -11,12 +11,17 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -35,6 +40,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.acite.katahana.domain.EvalGraphMode
@@ -49,6 +55,7 @@ import com.acite.katahana.ui.components.FrostedSurface
 import com.acite.katahana.ui.theme.StoneSwatch
 import com.acite.katahana.ui.theme.hanaAppearance
 import com.acite.katahana.ui.theme.hanaColors
+import com.acite.katahana.ui.theme.hanaFontFamily
 import com.acite.katahana.ui.theme.hanaTokens
 import kotlin.math.abs
 import kotlin.math.ceil
@@ -58,6 +65,8 @@ import kotlin.math.roundToInt
 private val PlotHeight = 128.dp
 private val PlotPadL = 40.dp
 private val PlotPadR = 14.dp
+
+private enum class AnalysisTab { Tree, Score, Quality }
 
 @Composable
 fun SessionTreeColumn(
@@ -70,7 +79,22 @@ fun SessionTreeColumn(
     onGraphMode: (EvalGraphMode) -> Unit,
     stats: QualityStats,
     modifier: Modifier = Modifier,
+    tabbed: Boolean = false,
 ) {
+    if (tabbed) {
+        TabbedAnalysisPane(
+            layout = layout,
+            reviewing = reviewing,
+            onGoToNode = onGoToNode,
+            samples = samples,
+            currentMoveNumber = currentMoveNumber,
+            graphMode = graphMode,
+            onGraphMode = onGraphMode,
+            stats = stats,
+            modifier = modifier,
+        )
+        return
+    }
     Column(
         modifier,
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -112,7 +136,22 @@ fun SessionTreeRow(
     onGraphMode: (EvalGraphMode) -> Unit,
     stats: QualityStats,
     modifier: Modifier = Modifier,
+    tabbed: Boolean = false,
 ) {
+    if (tabbed) {
+        TabbedAnalysisPane(
+            layout = layout,
+            reviewing = reviewing,
+            onGoToNode = onGoToNode,
+            samples = samples,
+            currentMoveNumber = currentMoveNumber,
+            graphMode = graphMode,
+            onGraphMode = onGraphMode,
+            stats = stats,
+            modifier = modifier,
+        )
+        return
+    }
     Row(
         modifier,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -149,6 +188,87 @@ fun SessionTreeRow(
 }
 
 @Composable
+private fun TabbedAnalysisPane(
+    layout: TreeLayout,
+    reviewing: Boolean,
+    onGoToNode: (String) -> Unit,
+    samples: List<EvalSample>,
+    currentMoveNumber: Int,
+    graphMode: EvalGraphMode,
+    onGraphMode: (EvalGraphMode) -> Unit,
+    stats: QualityStats,
+    modifier: Modifier = Modifier,
+) {
+    var tab by rememberSaveable { mutableStateOf(AnalysisTab.Tree) }
+    FrostedSurface(modifier) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .padding(start = 10.dp, end = 10.dp, top = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            ModePill(
+                Copy.gameTree,
+                selected = tab == AnalysisTab.Tree,
+                modifier = Modifier.weight(1f),
+            ) {
+                tab = AnalysisTab.Tree
+            }
+            ModePill(
+                Copy.score,
+                selected = tab == AnalysisTab.Score,
+                modifier = Modifier.weight(1f),
+            ) {
+                tab = AnalysisTab.Score
+            }
+            ModePill(
+                Copy.qualityTab,
+                selected = tab == AnalysisTab.Quality,
+                modifier = Modifier.weight(1f),
+            ) {
+                tab = AnalysisTab.Quality
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Box(
+            Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .padding(start = 10.dp, end = 10.dp, bottom = 10.dp),
+        ) {
+            when (tab) {
+                AnalysisTab.Tree -> GameTreeCard(
+                    layout = layout,
+                    reviewing = reviewing,
+                    onGoToNode = onGoToNode,
+                    compact = true,
+                    framed = false,
+                    modifier = Modifier.fillMaxSize(),
+                )
+                AnalysisTab.Score -> EvalGraphCard(
+                    samples = samples,
+                    currentMoveNumber = currentMoveNumber,
+                    mode = graphMode,
+                    onMode = onGraphMode,
+                    onSeek = onGoToNode,
+                    compact = true,
+                    expandPlot = true,
+                    framed = false,
+                    modifier = Modifier.fillMaxSize(),
+                )
+                AnalysisTab.Quality -> QualityStatsCard(
+                    stats = stats,
+                    compact = true,
+                    framed = false,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+        }
+    }
+}
+
+@Composable
 fun EvalGraphCard(
     samples: List<EvalSample>,
     currentMoveNumber: Int,
@@ -158,26 +278,32 @@ fun EvalGraphCard(
     modifier: Modifier = Modifier,
     compact: Boolean = false,
     expandPlot: Boolean = false,
+    framed: Boolean = true,
 ) {
     val tokens = hanaTokens
     val colors = hanaColors
-    FrostedSurface(modifier) {
+    val body: @Composable () -> Unit = {
         Column(
             Modifier
                 .then(if (expandPlot) Modifier.fillMaxHeight() else Modifier)
-                .padding(if (compact) 10.dp else 14.dp),
+                .padding(if (compact && framed) 10.dp else if (framed) 14.dp else 0.dp),
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text(
-                    if (mode == EvalGraphMode.Score) Copy.score else Copy.winrate,
-                    color = colors.text,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.weight(1f),
-                )
+                if (framed) {
+                    Text(
+                        if (mode == EvalGraphMode.Score) Copy.score else Copy.winrate,
+                        color = colors.text,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.weight(1f),
+                        maxLines = 1,
+                    )
+                } else {
+                    Spacer(Modifier.weight(1f))
+                }
                 ModePill(Copy.score, selected = mode == EvalGraphMode.Score) {
                     onMode(EvalGraphMode.Score)
                 }
@@ -200,16 +326,26 @@ fun EvalGraphCard(
             )
         }
     }
+    if (framed) {
+        FrostedSurface(modifier) { body() }
+    } else {
+        Box(modifier) { body() }
+    }
 }
 
 @Composable
-private fun ModePill(label: String, selected: Boolean, onClick: () -> Unit) {
+private fun ModePill(
+    label: String,
+    selected: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
     val colors = hanaColors
     val bg = if (selected) colors.accentPink.copy(alpha = 0.22f) else Color.White.copy(alpha = 0.05f)
     val border = if (selected) colors.accentPink.copy(alpha = 0.40f) else Color.White.copy(alpha = 0.10f)
     val fg = colors.text
     Box(
-        Modifier
+        modifier
             .clip(hanaTokens.capsule)
             .background(bg)
             .border(1.dp, border, hanaTokens.capsule)
@@ -217,7 +353,14 @@ private fun ModePill(label: String, selected: Boolean, onClick: () -> Unit) {
             .padding(horizontal = 10.dp, vertical = 4.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(label, color = fg, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+        Text(
+            label,
+            color = fg,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
@@ -234,8 +377,19 @@ private fun EvalPlot(
     val blackInk = curveInk(appearance.first, colors.bgCard)
     val whiteInk = curveInk(appearance.second, colors.bgCard)
     val measurer = rememberTextMeasurer()
-    val labelStyle = TextStyle(color = colors.textDim, fontSize = 10.sp, fontWeight = FontWeight.Medium)
-    val tagStyle = TextStyle(color = colors.text, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+    val fonts = hanaFontFamily
+    val labelStyle = TextStyle(
+        color = colors.textDim,
+        fontSize = 10.sp,
+        fontWeight = FontWeight.Medium,
+        fontFamily = fonts,
+    )
+    val tagStyle = TextStyle(
+        color = colors.text,
+        fontSize = 10.sp,
+        fontWeight = FontWeight.SemiBold,
+        fontFamily = fonts,
+    )
     val yMax = yMaxFor(samples, mode)
     val xMax = maxOf(
         samples.maxOfOrNull { it.moveNumber } ?: 0,

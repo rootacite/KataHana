@@ -10,6 +10,7 @@ import com.acite.katahana.engine.EngineProfile
 import com.acite.katahana.engine.EngineStatus
 import com.acite.katahana.engine.TestResult
 import com.acite.katahana.domain.GameConfig
+import com.acite.katahana.settings.AnalysisLayoutMode
 import com.acite.katahana.settings.FORECAST_DROP_MS_DEFAULT
 import com.acite.katahana.settings.OwnershipStyle
 import com.acite.katahana.settings.QualityThresholds
@@ -42,6 +43,9 @@ class SettingsViewModel(
     )
     val appearanceId: StateFlow<String> = repo.appearanceId.stateIn(
         viewModelScope, SharingStarted.WhileSubscribed(1_000), Appearance.DEFAULT_ID,
+    )
+    val analysisLayoutMode: StateFlow<AnalysisLayoutMode> = repo.analysisLayoutMode.stateIn(
+        viewModelScope, SharingStarted.WhileSubscribed(1_000), AnalysisLayoutMode.Default,
     )
     val ownershipStyle: StateFlow<OwnershipStyle> = repo.ownershipStyle.stateIn(
         viewModelScope, SharingStarted.WhileSubscribed(1_000), OwnershipStyle.Default,
@@ -86,6 +90,9 @@ class SettingsViewModel(
     fun setConfirmMove(value: Boolean) = launch { repo.setConfirmMove(value) }
     fun setShowCoords(value: Boolean) = launch { repo.setShowCoords(value) }
     fun setAppearanceId(value: String) = launch { repo.setAppearanceId(value) }
+    fun setAnalysisLayoutMode(value: AnalysisLayoutMode) = launch {
+        repo.setAnalysisLayoutMode(value)
+    }
     fun setOwnershipStyle(value: OwnershipStyle) = launch { repo.setOwnershipStyle(value) }
     fun setEngineName(value: String) = launch { repo.setEngineName(value) }
     fun setEngineUrl(value: String) = launch { repo.setEngineUrl(value) }

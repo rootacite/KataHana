@@ -63,46 +63,65 @@ fun GameTreeCard(
     onGoToNode: (String) -> Unit,
     modifier: Modifier = Modifier,
     compact: Boolean = false,
+    framed: Boolean = true,
 ) {
     val colors = hanaColors
-    FrostedSurface(
-        modifier.then(if (compact) Modifier.fillMaxHeight() else Modifier),
-    ) {
+    val body: @Composable () -> Unit = {
         Column(
             Modifier
                 .then(if (compact) Modifier.fillMaxHeight() else Modifier)
-                .padding(if (compact) 10.dp else 14.dp),
+                .padding(if (compact && framed) 10.dp else if (framed) 14.dp else 0.dp),
         ) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Text(
-                Copy.gameTree,
-                color = colors.text,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.weight(1f),
-            )
-            if (reviewing) {
-                Text(
-                    Copy.review,
-                    color = colors.accentPink,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.SemiBold,
-                )
+            if (framed || reviewing) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    if (framed) {
+                        Text(
+                            Copy.gameTree,
+                            color = colors.text,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.weight(1f),
+                            maxLines = 1,
+                        )
+                    } else {
+                        Spacer(Modifier.weight(1f))
+                    }
+                    if (reviewing) {
+                        Text(
+                            Copy.review,
+                            color = colors.accentPink,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                        )
+                    }
+                }
             }
+            if (reviewing) {
+                Spacer(Modifier.height(6.dp))
+                Text(Copy.reviewHint, color = colors.textDim, fontSize = 11.sp, lineHeight = 14.sp)
+            }
+            if (framed || reviewing) {
+                Spacer(Modifier.height(10.dp))
+            }
+            GameTreeGraph(
+                layout = layout,
+                onGoToNode = onGoToNode,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(if (compact) Modifier.weight(1f) else Modifier.height(220.dp)),
+            )
         }
-        if (reviewing) {
-            Spacer(Modifier.height(6.dp))
-            Text(Copy.reviewHint, color = colors.textDim, fontSize = 11.sp, lineHeight = 14.sp)
+    }
+    if (framed) {
+        FrostedSurface(modifier.then(if (compact) Modifier.fillMaxHeight() else Modifier)) {
+            body()
         }
-        Spacer(Modifier.height(10.dp))
-        GameTreeGraph(
-            layout = layout,
-            onGoToNode = onGoToNode,
-            modifier = Modifier
-                .fillMaxWidth()
-                .then(if (compact) Modifier.weight(1f) else Modifier.height(220.dp)),
-        )
-        }
+    } else {
+        Box(modifier) { body() }
     }
 }
 

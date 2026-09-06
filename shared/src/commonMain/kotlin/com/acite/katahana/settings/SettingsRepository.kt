@@ -58,6 +58,9 @@ class SettingsRepository {
     val appearanceId: Flow<String> = dataStore.data.map {
         it[Keys.APPEARANCE] ?: "sky_sakura"
     }
+    val analysisLayoutMode: Flow<AnalysisLayoutMode> = dataStore.data.map {
+        AnalysisLayoutMode.fromId(it[Keys.ANALYSIS_LAYOUT])
+    }
     val engineName: Flow<String> = dataStore.data.map { it[Keys.ENGINE_NAME] ?: "KataGo" }
     val engineUrl: Flow<String> = dataStore.data.map {
         it[Keys.ENGINE_URL] ?: EngineProfile.DEFAULT_URL
@@ -119,6 +122,9 @@ class SettingsRepository {
     suspend fun setDrawerAcrylic(value: Float) = edit { it[Keys.DRAWER_ACRYLIC] = value.coerceIn(0f, 1f) }
     suspend fun setOwnershipStyle(value: OwnershipStyle) = edit { it[Keys.OWNERSHIP_STYLE] = value.id }
     suspend fun setAppearanceId(value: String) = edit { it[Keys.APPEARANCE] = value }
+    suspend fun setAnalysisLayoutMode(value: AnalysisLayoutMode) = edit {
+        it[Keys.ANALYSIS_LAYOUT] = value.id
+    }
     suspend fun setEngineName(value: String) = edit { it[Keys.ENGINE_NAME] = value }
     suspend fun setEngineUrl(value: String) = edit { it[Keys.ENGINE_URL] = value }
     suspend fun setEngineToken(value: String) = edit { it[Keys.ENGINE_TOKEN] = value }
@@ -163,6 +169,7 @@ class SettingsRepository {
         val DRAWER_ACRYLIC = floatPreferencesKey("drawer_acrylic")
         val OWNERSHIP_STYLE = stringPreferencesKey("ownership_style")
         val APPEARANCE = stringPreferencesKey("appearance")
+        val ANALYSIS_LAYOUT = stringPreferencesKey("analysis_layout")
         val ENGINE_NAME = stringPreferencesKey("engine_name")
         val ENGINE_URL = stringPreferencesKey("engine_url")
         val ENGINE_TOKEN = stringPreferencesKey("engine_token")

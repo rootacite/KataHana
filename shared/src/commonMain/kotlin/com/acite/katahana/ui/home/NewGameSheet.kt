@@ -41,7 +41,7 @@ fun NewGameSheet(
     var aiStyle by remember(initial) { mutableStateOf(initial.aiStyle) }
     val title = when (lockedMode) {
         PlayMode.HumanVsHuman -> Copy.hvh
-        PlayMode.HumanVsAi -> Copy.humanVsKatago
+        PlayMode.HumanVsAi -> Copy.hvai
         null -> Copy.newGame
     }
 
@@ -78,7 +78,7 @@ fun NewGameSheet(
             Label(Copy.match)
             ChoiceRow {
                 CapsuleChoice(Copy.hvh, mode == PlayMode.HumanVsHuman, { mode = PlayMode.HumanVsHuman }, Modifier.weight(1f))
-                CapsuleChoice(Copy.humanVsKatago, mode == PlayMode.HumanVsAi, { mode = PlayMode.HumanVsAi }, Modifier.weight(1f))
+                CapsuleChoice(Copy.hvai, mode == PlayMode.HumanVsAi, { mode = PlayMode.HumanVsAi }, Modifier.weight(1f))
             }
         }
         if (mode == PlayMode.HumanVsAi) {

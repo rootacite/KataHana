@@ -13,6 +13,8 @@ fun KataHanaTheme(
     content: @Composable () -> Unit,
 ) {
     val palette = appearance.palette
+    val fonts = rememberHanaFontFamily()
+    val typography = remember(fonts) { hanaTypography(fonts) }
     val scheme = remember(palette) {
         darkColorScheme(
             primary = palette.accentPink,
@@ -45,10 +47,11 @@ fun KataHanaTheme(
         LocalHanaTokens provides HanaTokens(),
         LocalAppearance provides appearance,
         LocalHanaPalette provides palette,
+        LocalHanaFontFamily provides fonts,
     ) {
         MaterialTheme(
             colorScheme = scheme,
-            typography = HanaTypography,
+            typography = typography,
             content = content,
         )
     }
