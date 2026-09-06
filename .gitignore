@@ -25,3 +25,6 @@ engine/home/
 engine/bin/
 engine/__pycache__/
 *.pyc
+
+# mdBook build output (doc source of truth lives in doc/src/)
+doc/book/

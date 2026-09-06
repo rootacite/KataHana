@@ -1,0 +1,7 @@
+[book]
+title = "KataHana 开发手册"
+authors = ["rootacite"]
+language = "zh"
+
+[output.html]
+default-theme = "ayu"
