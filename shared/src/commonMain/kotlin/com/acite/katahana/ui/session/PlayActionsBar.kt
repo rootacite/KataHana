@@ -50,9 +50,6 @@ fun PlayActionsBar(
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        PlayGlyphButton(PlayGlyph.Pass, Copy.pass, humanTurn, onPass)
-        PlayGlyphButton(PlayGlyph.Undo, Copy.undo, snapshot.humanControls && snapshot.canUndo, onUndo)
-        PlayGlyphButton(PlayGlyph.Redo, Copy.redo, snapshot.humanControls && snapshot.canRedo, onRedo)
         if (snapshot.reviewing) {
             PlayGlyphButton(PlayGlyph.Resume, Copy.exitReview, true, onExitReview)
         }
@@ -62,6 +59,9 @@ fun PlayActionsBar(
         if (hasSelection) {
             PlayGlyphButton(PlayGlyph.Confirm, Copy.confirm, humanTurn, onConfirm, emphasized = true)
         }
+        PlayGlyphButton(PlayGlyph.Pass, Copy.pass, humanTurn, onPass)
+        PlayGlyphButton(PlayGlyph.Undo, Copy.undo, snapshot.humanControls && snapshot.canUndo, onUndo)
+        PlayGlyphButton(PlayGlyph.Redo, Copy.redo, snapshot.humanControls && snapshot.canRedo, onRedo)
     }
 }
 
@@ -81,9 +81,6 @@ fun PlayIconCluster(
     vertical: Boolean = false,
 ) {
     val buttons: @Composable () -> Unit = {
-        PlayGlyphButton(PlayGlyph.Pass, Copy.pass, humanTurn, onPass)
-        PlayGlyphButton(PlayGlyph.Undo, Copy.undo, snapshot.humanControls && snapshot.canUndo, onUndo)
-        PlayGlyphButton(PlayGlyph.Redo, Copy.redo, snapshot.humanControls && snapshot.canRedo, onRedo)
         if (snapshot.reviewing) {
             PlayGlyphButton(PlayGlyph.Resume, Copy.exitReview, true, onExitReview)
         }
@@ -93,6 +90,9 @@ fun PlayIconCluster(
         if (hasSelection) {
             PlayGlyphButton(PlayGlyph.Confirm, Copy.confirm, humanTurn, onConfirm, emphasized = true)
         }
+        PlayGlyphButton(PlayGlyph.Pass, Copy.pass, humanTurn, onPass)
+        PlayGlyphButton(PlayGlyph.Undo, Copy.undo, snapshot.humanControls && snapshot.canUndo, onUndo)
+        PlayGlyphButton(PlayGlyph.Redo, Copy.redo, snapshot.humanControls && snapshot.canRedo, onRedo)
     }
     if (vertical) {
         Column(
