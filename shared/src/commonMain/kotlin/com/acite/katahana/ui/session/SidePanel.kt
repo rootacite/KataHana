@@ -42,7 +42,7 @@ import com.acite.katahana.ui.Copy
 import com.acite.katahana.ui.components.CapsuleButton
 import com.acite.katahana.ui.components.QuietTextButton
 import com.acite.katahana.ui.components.RankCard
-import com.acite.katahana.ui.theme.HanaColors
+import com.acite.katahana.ui.theme.hanaColors
 import com.acite.katahana.ui.theme.hanaAppearance
 import com.acite.katahana.ui.theme.hanaTokens
 
@@ -56,6 +56,7 @@ fun SidePanel(
     onConfirm: () -> Unit,
     forecastActive: Boolean = false,
     onEndForecast: () -> Unit = {},
+    onExitReview: () -> Unit = {},
     modifier: Modifier = Modifier,
     engineOnline: Boolean = false,
     analyzing: Boolean = false,
@@ -115,11 +116,11 @@ fun SidePanel(
                 else -> null
             }
             if (aiLine != null) {
-                Text(aiLine, color = HanaColors.accentLilac, fontSize = 13.sp)
+                Text(aiLine, color = hanaColors.accentLilac, fontSize = 13.sp)
             }
         }
         if (snapshot.ended) {
-            Text(Copy.twoPasses, color = HanaColors.accentPink, fontSize = 14.sp)
+            Text(Copy.twoPasses, color = hanaColors.accentPink, fontSize = 14.sp)
         }
         val humanTurn = snapshot.humanControls && !snapshot.ended
         PlayActionsBar(
@@ -132,6 +133,7 @@ fun SidePanel(
             onConfirm = onConfirm,
             forecastActive = forecastActive,
             onEndForecast = onEndForecast,
+            onExitReview = onExitReview,
         )
         if (snapshot.variationCount > 1) {
             VariationRow(snapshot.variationIndex, snapshot.variationCount, onCycleVariation)
@@ -199,7 +201,7 @@ fun SidePanel(
         reviewProgress?.let { progress ->
             Text(
                 Copy.reviewProgress(progress.done, progress.total),
-                color = if (progress.running) HanaColors.accentLilac else HanaColors.textDim,
+                color = if (progress.running) hanaColors.accentLilac else hanaColors.textDim,
                 fontSize = 13.sp,
             )
         }
@@ -239,19 +241,19 @@ private fun ToggleCard(
         Modifier
             .fillMaxWidth()
             .clip(tokens.panel)
-            .background(HanaColors.bgCard)
+            .background(hanaColors.bgCard)
             .padding(horizontal = 14.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(label, color = HanaColors.text, fontSize = 14.sp, modifier = Modifier.weight(1f))
+        Text(label, color = hanaColors.text, fontSize = 14.sp, modifier = Modifier.weight(1f))
         Switch(
             checked = checked,
             onCheckedChange = onChange,
             colors = SwitchDefaults.colors(
-                checkedThumbColor = HanaColors.text,
-                checkedTrackColor = HanaColors.accentPink,
-                uncheckedThumbColor = HanaColors.textDim,
-                uncheckedTrackColor = HanaColors.stroke,
+                checkedThumbColor = hanaColors.text,
+                checkedTrackColor = hanaColors.accentPink,
+                uncheckedThumbColor = hanaColors.textDim,
+                uncheckedTrackColor = hanaColors.stroke,
             ),
         )
     }
@@ -266,7 +268,7 @@ private fun VariationRow(index: Int, count: Int, onCycle: (Int) -> Unit) {
     ) {
         Text(
             "${Copy.variation} ${index + 1}/$count",
-            color = HanaColors.text,
+            color = hanaColors.text,
             fontSize = 13.sp,
             modifier = Modifier.weight(1f),
         )
@@ -288,28 +290,28 @@ private fun CandidatesCard(
         Modifier
             .fillMaxWidth()
             .clip(tokens.panel)
-            .background(HanaColors.bgCard)
+            .background(hanaColors.bgCard)
             .padding(14.dp),
     ) {
-        Text(Copy.candidates, color = HanaColors.text, fontSize = 14.sp)
+        Text(Copy.candidates, color = hanaColors.text, fontSize = 14.sp)
         Spacer(Modifier.height(8.dp))
         when {
-            !engineOnline -> Text(Copy.engineOfflineHint, color = HanaColors.textDim, fontSize = 13.sp)
+            !engineOnline -> Text(Copy.engineOfflineHint, color = hanaColors.textDim, fontSize = 13.sp)
             candidates.isEmpty() -> Text(
                 if (analyzing) Copy.engineAnalyzing else Copy.waitingForAnalysis,
-                color = HanaColors.textDim,
+                color = hanaColors.textDim,
                 fontSize = 13.sp,
             )
             else -> candidates.forEachIndexed { index, candidate ->
                 val loss = formatScoreLoss(candidate.pointsLost)
                 Text(
                     "${candidate.gtp}  ·  $loss  ·  ${candidate.visits} ${Copy.visitsLabel}",
-                    color = HanaColors.text,
+                    color = hanaColors.text,
                     fontSize = 13.sp,
                 )
                 val pv = formatPv(candidate.pv)
                 if (pv.isNotEmpty()) {
-                    Text(pv, color = HanaColors.textDim, fontSize = 12.sp)
+                    Text(pv, color = hanaColors.textDim, fontSize = 12.sp)
                 }
                 if (index != candidates.lastIndex) Spacer(Modifier.height(6.dp))
             }
@@ -327,7 +329,7 @@ fun StatusCard(
         Modifier
             .fillMaxWidth()
             .clip(tokens.panel)
-            .background(HanaColors.bgCard)
+            .background(hanaColors.bgCard)
             .padding(14.dp),
     ) {
         val appearance = hanaAppearance
@@ -354,26 +356,26 @@ fun StatusCard(
         val toPlay = if (snapshot.toPlay == StoneColor.Black) Copy.black else Copy.white
         Text(
             "${Copy.toPlay}: $toPlay",
-            color = HanaColors.text,
+            color = hanaColors.text,
             fontSize = 16.sp,
         )
         Spacer(Modifier.height(6.dp))
         Text(
             "${Copy.move} ${snapshot.moveNumber}  ·  ${snapshot.size}×${snapshot.size}  ·  komi ${snapshot.komi}",
-            color = HanaColors.textDim,
+            color = hanaColors.textDim,
             fontSize = 13.sp,
         )
         if (snapshot.reviewing) {
             Spacer(Modifier.height(6.dp))
-            Text(Copy.review, color = HanaColors.accentPink, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+            Text(Copy.review, color = hanaColors.accentPink, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
         }
         Spacer(Modifier.height(10.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("${Copy.captured}  ", color = HanaColors.textDim, fontSize = 13.sp)
+            Text("${Copy.captured}  ", color = hanaColors.textDim, fontSize = 13.sp)
             ColorDot(appearance.first.fill, 8.dp)
-            Text(" ${snapshot.capturedByBlack}   ", color = HanaColors.textDim, fontSize = 13.sp)
+            Text(" ${snapshot.capturedByBlack}   ", color = hanaColors.textDim, fontSize = 13.sp)
             ColorDot(appearance.second.fill, 8.dp)
-            Text(" ${snapshot.capturedByWhite}", color = HanaColors.textDim, fontSize = 13.sp)
+            Text(" ${snapshot.capturedByWhite}", color = hanaColors.textDim, fontSize = 13.sp)
         }
     }
 }
@@ -401,7 +403,7 @@ private fun SeatRow(
         Column(Modifier.weight(1f)) {
             Text(
                 label,
-                color = if (toPlay) HanaColors.text else HanaColors.textDim,
+                color = if (toPlay) hanaColors.text else hanaColors.textDim,
                 fontSize = 13.sp,
                 fontWeight = if (toPlay) FontWeight.SemiBold else FontWeight.Normal,
             )
@@ -409,11 +411,11 @@ private fun SeatRow(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text(name, color = HanaColors.accentLilac, fontSize = 14.sp)
+                Text(name, color = hanaColors.accentLilac, fontSize = 14.sp)
                 if (rank != null) RankCard(rank, emphasized = godlike)
             }
         }
-        Text("›", color = HanaColors.textDim, fontSize = 18.sp)
+        Text("›", color = hanaColors.textDim, fontSize = 18.sp)
     }
 }
 

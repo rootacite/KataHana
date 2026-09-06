@@ -193,6 +193,13 @@ class QueryBuilderTest {
         assertTrue(encoded.contains("\"humanSLProfile\":\"preaz_5k\""))
         val policyJson = analysisJson.encodeToString(AnalysisQuery.serializer(), policy)
         assertTrue(!policyJson.contains("humanSLProfile"))
+
+        val ping = buildBenchPingQuery("bench:ping:0:ab")
+        assertEquals("bench:ping:0:ab", ping.id)
+        assertEquals("query_version", ping.action)
+        val pingJson = analysisJson.encodeToString(VersionQuery.serializer(), ping)
+        assertTrue(pingJson.contains("\"action\":\"query_version\""))
+        assertTrue(!pingJson.contains("boardXSize"))
     }
 
     @Test

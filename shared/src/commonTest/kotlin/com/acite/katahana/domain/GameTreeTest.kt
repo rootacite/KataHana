@@ -153,4 +153,43 @@ class GameTreeTest {
         val found = tree.nodeAtPath(path)
         assertEquals(tree.current.id, found?.id)
     }
+
+    @Test
+    fun lastLeafStaysPutWhileReviewingAndResumeReturns() {
+        val tree = GameTree(9)
+        tree.play(Point(4, 4))
+        tree.play(Point(3, 3))
+        val leaf = tree.current.id
+        assertEquals(leaf, tree.lastLeaf().id)
+        assertTrue(tree.undo())
+        assertTrue(tree.reviewing)
+        assertEquals(leaf, tree.lastLeaf().id)
+        assertTrue(tree.resumeLeaf())
+        assertEquals(leaf, tree.current.id)
+        assertFalse(tree.reviewing)
+        assertFalse(tree.resumeLeaf())
+    }
+
+    @Test
+    fun newLeafBecomesResumeTarget() {
+        val tree = GameTree(9)
+        tree.play(Point(4, 4))
+        val first = tree.current.id
+        tree.undo()
+        tree.play(Point(3, 3))
+        assertEquals(tree.current.id, tree.lastLeaf().id)
+        assertTrue(tree.lastLeaf().id != first)
+    }
+
+    @Test
+    fun syncResumeLeafUsesPreferredContinuation() {
+        val tree = GameTree(9)
+        tree.play(Point(2, 2))
+        tree.play(Point(3, 3))
+        val leaf = tree.current.id
+        tree.applyChildPath(emptyList())
+        assertEquals(tree.root.id, tree.current.id)
+        assertTrue(tree.reviewing)
+        assertEquals(leaf, tree.lastLeaf().id)
+    }
 }

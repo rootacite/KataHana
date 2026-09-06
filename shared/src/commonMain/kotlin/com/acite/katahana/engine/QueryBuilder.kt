@@ -229,6 +229,8 @@ private fun benchBoard(id: String, maxVisits: Int, includePolicy: Boolean): Anal
     reportDuringSearchEvery = null,
 )
 
+fun buildBenchPingQuery(id: String): VersionQuery = VersionQuery(id = id)
+
 fun buildBenchPolicyQuery(id: String): AnalysisQuery = benchBoard(id, maxVisits = 1, includePolicy = true)
 
 fun buildBenchSearchQuery(id: String, visits: Int = BENCH_PLAY_VISITS): AnalysisQuery =

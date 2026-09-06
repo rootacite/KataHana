@@ -46,6 +46,12 @@ data class TerminateQuery(
 )
 
 @Serializable
+data class VersionQuery(
+    val id: String,
+    val action: String = "query_version",
+)
+
+@Serializable
 data class AnalysisResponse(
     val id: String? = null,
     val isDuringSearch: Boolean = false,

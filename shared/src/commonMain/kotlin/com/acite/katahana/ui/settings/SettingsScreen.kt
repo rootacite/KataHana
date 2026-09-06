@@ -8,9 +8,6 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -50,11 +47,13 @@ import com.acite.katahana.ui.board.OwnershipMotion
 import com.acite.katahana.ui.board.drawOwnershipLayer
 import com.acite.katahana.ui.board.drawStoneSwatch
 import com.acite.katahana.domain.Point
+import com.acite.katahana.ui.components.HanaBackdrop
+import com.acite.katahana.ui.components.HanaChoiceRow
 import com.acite.katahana.ui.components.HanaField
 import com.acite.katahana.ui.components.HanaSection
 import com.acite.katahana.ui.components.ScreenHeader
 import com.acite.katahana.ui.theme.Appearance
-import com.acite.katahana.ui.theme.HanaColors
+import com.acite.katahana.ui.theme.hanaColors
 import com.acite.katahana.ui.theme.StoneSwatch
 import com.acite.katahana.ui.theme.hanaTokens
 import dev.zacsweers.metrox.viewmodel.metroViewModel
@@ -76,50 +75,34 @@ private fun SettingsRoute(vm: SettingsViewModel) {
     val quality by vm.quality.collectAsState()
     val acrylic by vm.drawerAcrylic.collectAsState()
     val forecastDropMs by vm.forecastDropMs.collectAsState()
-    val tokens = hanaTokens
 
+    HanaBackdrop { hazeState ->
     Column(
         Modifier
             .fillMaxSize()
-            .background(HanaColors.bgApp)
             .imePadding()
             .verticalScroll(rememberScrollState())
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(22.dp),
     ) {
         ScreenHeader(Copy.settings, onBack = { navigator.pop() })
-        HanaSection(Copy.appearance, hint = Copy.appearanceHint) {
+        HanaSection(Copy.appearance, hazeState, hint = Copy.appearanceHint) {
             Appearance.all.forEach { appearance ->
                 val selected = appearance.id == appearanceId
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .clip(tokens.panel)
-                        .background(HanaColors.bgPanel)
-                        .then(
-                            if (selected) {
-                                Modifier.border(1.5.dp, HanaColors.accentPink, tokens.panel)
-                            } else {
-                                Modifier.border(1.dp, HanaColors.stroke, tokens.panel)
-                            },
-                        )
-                        .clickable { vm.setAppearanceId(appearance.id) }
-                        .padding(horizontal = 12.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
+                HanaChoiceRow(selected = selected, onClick = { vm.setAppearanceId(appearance.id) }) {
                     StonePairPreview(appearance)
                     Spacer(Modifier.size(14.dp))
                     Column(Modifier.weight(1f)) {
-                        Text(appearance.label, color = HanaColors.text, fontSize = 15.sp)
-                        Text(appearance.blurb, color = HanaColors.textDim, fontSize = 12.sp)
+                        Text(appearance.label, color = hanaColors.text, fontSize = 15.sp)
+                        Text(appearance.blurb, color = hanaColors.textDim, fontSize = 12.sp)
                     }
                 }
             }
         }
-        HanaSection(Copy.drawerFrost, hint = Copy.drawerFrostHint) {
+        HanaSection(Copy.drawerFrost, hazeState, hint = Copy.drawerFrostHint) {
             Text(
                 "${(acrylic * 100f).toInt()}%",
-                color = HanaColors.accentLilac,
+                color = hanaColors.accentLilac,
                 fontSize = 13.sp,
             )
             Slider(
@@ -127,21 +110,21 @@ private fun SettingsRoute(vm: SettingsViewModel) {
                 onValueChange = vm::setDrawerAcrylic,
                 valueRange = 0f..1f,
                 colors = SliderDefaults.colors(
-                    thumbColor = HanaColors.accentPink,
-                    activeTrackColor = HanaColors.accentPink,
-                    inactiveTrackColor = HanaColors.stroke,
+                    thumbColor = hanaColors.accentPink,
+                    activeTrackColor = hanaColors.accentPink,
+                    inactiveTrackColor = hanaColors.stroke,
                 ),
             )
         }
-        HanaSection(Copy.boardSection) {
+        HanaSection(Copy.boardSection, hazeState) {
             ToggleRow(Copy.confirmMove, confirm, vm::setConfirmMove)
             ToggleRow(Copy.showCoords, coords, vm::setShowCoords)
         }
-        HanaSection(Copy.forecastDrop, hint = Copy.forecastDropHint) {
+        HanaSection(Copy.forecastDrop, hazeState, hint = Copy.forecastDropHint) {
             val seconds = forecastDropMs / 1000f
             Text(
                 if (forecastDropMs <= 0) Copy.forecastDropInstant else Copy.forecastDropValue(seconds),
-                color = HanaColors.accentLilac,
+                color = hanaColors.accentLilac,
                 fontSize = 13.sp,
             )
             Slider(
@@ -152,41 +135,26 @@ private fun SettingsRoute(vm: SettingsViewModel) {
                 },
                 valueRange = 0f..(FORECAST_DROP_MS_MAX / 1000f),
                 colors = SliderDefaults.colors(
-                    thumbColor = HanaColors.accentPink,
-                    activeTrackColor = HanaColors.accentPink,
-                    inactiveTrackColor = HanaColors.stroke,
+                    thumbColor = hanaColors.accentPink,
+                    activeTrackColor = hanaColors.accentPink,
+                    inactiveTrackColor = hanaColors.stroke,
                 ),
             )
         }
-        HanaSection(Copy.ownershipStyle, hint = Copy.ownershipStyleHint) {
+        HanaSection(Copy.ownershipStyle, hazeState, hint = Copy.ownershipStyleHint) {
             OwnershipStyle.entries.forEach { style ->
                 val selected = style == ownershipStyle
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .clip(tokens.panel)
-                        .background(HanaColors.bgPanel)
-                        .then(
-                            if (selected) {
-                                Modifier.border(1.5.dp, HanaColors.accentPink, tokens.panel)
-                            } else {
-                                Modifier.border(1.dp, HanaColors.stroke, tokens.panel)
-                            },
-                        )
-                        .clickable { vm.setOwnershipStyle(style) }
-                        .padding(horizontal = 12.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
+                HanaChoiceRow(selected = selected, onClick = { vm.setOwnershipStyle(style) }) {
                     OwnershipStylePreview(style)
                     Spacer(Modifier.size(14.dp))
                     Column(Modifier.weight(1f)) {
-                        Text(styleTitle(style), color = HanaColors.text, fontSize = 15.sp)
-                        Text(styleBlurb(style), color = HanaColors.textDim, fontSize = 12.sp)
+                        Text(styleTitle(style), color = hanaColors.text, fontSize = 15.sp)
+                        Text(styleBlurb(style), color = hanaColors.textDim, fontSize = 12.sp)
                     }
                 }
             }
         }
-        HanaSection(Copy.quality, hint = Copy.qualityHint) {
+        HanaSection(Copy.quality, hazeState, hint = Copy.qualityHint) {
             ThresholdField("Blunder (≥ purple)", quality.blunder) {
                 vm.setQuality(quality.copy(blunder = it))
             }
@@ -204,6 +172,7 @@ private fun SettingsRoute(vm: SettingsViewModel) {
             }
         }
         Spacer(Modifier.height(8.dp))
+    }
     }
 }
 
@@ -258,13 +227,14 @@ private fun OwnershipStylePreview(style: OwnershipStyle) {
         ),
         label = "previewTwinkle",
     )
+    val colors = hanaColors
     Canvas(
         Modifier
             .size(64.dp)
             .clip(hanaTokens.panel),
     ) {
         drawRoundRect(
-            color = HanaColors.boardBg,
+            color = colors.boardBg,
             topLeft = Offset.Zero,
             size = Size(this.size.width, this.size.height),
             cornerRadius = CornerRadius(12.dp.toPx(), 12.dp.toPx()),
@@ -296,6 +266,8 @@ private fun OwnershipStylePreview(style: OwnershipStyle) {
                 breath = breath,
                 twinkle = twinkle,
             ),
+            ownBlue = colors.accentBlue,
+            ownPink = colors.accentPink,
         )
     }
 }
@@ -322,15 +294,15 @@ private fun ToggleRow(label: String, checked: Boolean, onChange: (Boolean) -> Un
         Modifier.fillMaxWidth().padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(label, color = HanaColors.text, modifier = Modifier.weight(1f), fontSize = 16.sp)
+        Text(label, color = hanaColors.text, modifier = Modifier.weight(1f), fontSize = 16.sp)
         Switch(
             checked = checked,
             onCheckedChange = onChange,
             colors = SwitchDefaults.colors(
-                checkedThumbColor = HanaColors.text,
-                checkedTrackColor = HanaColors.accentPink,
-                uncheckedThumbColor = HanaColors.textDim,
-                uncheckedTrackColor = HanaColors.stroke,
+                checkedThumbColor = hanaColors.text,
+                checkedTrackColor = hanaColors.accentPink,
+                uncheckedThumbColor = hanaColors.textDim,
+                uncheckedTrackColor = hanaColors.stroke,
             ),
         )
     }

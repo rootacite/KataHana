@@ -1,7 +1,9 @@
 package com.acite.katahana.engine
 
+import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class EngineBenchmarkTest {
@@ -18,29 +20,139 @@ class EngineBenchmarkTest {
     }
 
     @Test
-    fun concludeUsesFiveInclusiveTiers() {
-        assertEquals(BenchmarkVerdict.Excellent, conclude(80, 350, 1_500))
-        assertEquals(BenchmarkVerdict.Excellent, conclude(40, 200, 800))
-        assertEquals(BenchmarkVerdict.Smooth, conclude(81, 350, 1_500))
-        assertEquals(BenchmarkVerdict.Smooth, conclude(80, 351, 1_500))
-        assertEquals(BenchmarkVerdict.Smooth, conclude(80, 350, 1_501))
-        assertEquals(BenchmarkVerdict.Smooth, conclude(200, 1_000, 4_000))
-        assertEquals(BenchmarkVerdict.Playable, conclude(201, 1_000, 4_000))
-        assertEquals(BenchmarkVerdict.Playable, conclude(400, 2_500, 10_000))
-        assertEquals(BenchmarkVerdict.Tight, conclude(401, 2_500, 10_000))
-        assertEquals(BenchmarkVerdict.Tight, conclude(1_000, 6_000, 25_000))
-        assertEquals(BenchmarkVerdict.Strained, conclude(1_001, 6_000, 25_000))
-        assertEquals(BenchmarkVerdict.Strained, conclude(1_000, 6_001, 25_000))
-        assertEquals(BenchmarkVerdict.Strained, conclude(1_000, 6_000, 25_001))
-        assertEquals(BenchmarkVerdict.Strained, conclude(40, 200, 30_000))
-        assertEquals(BenchmarkVerdict.Strained, conclude(2_000, 200, 800))
+    fun networkVerdictUsesInclusiveRttTiers() {
+        assertEquals(NetworkVerdict.Local, networkVerdict(20))
+        assertEquals(NetworkVerdict.Local, networkVerdict(8))
+        assertEquals(NetworkVerdict.Lan, networkVerdict(21))
+        assertEquals(NetworkVerdict.Lan, networkVerdict(50))
+        assertEquals(NetworkVerdict.Nearby, networkVerdict(51))
+        assertEquals(NetworkVerdict.Nearby, networkVerdict(120))
+        assertEquals(NetworkVerdict.Distant, networkVerdict(121))
+        assertEquals(NetworkVerdict.Distant, networkVerdict(300))
+        assertEquals(NetworkVerdict.HighDelay, networkVerdict(301))
+        assertEquals(NetworkVerdict.HighDelay, networkVerdict(800))
     }
 
     @Test
-    fun assembleReportFillsLadderAndExcellentVerdict() {
-        val policy = List(30) { 70L }
+    fun hardwareScoreIsLogMappedAndClamped() {
+        assertEquals(0f, hardwareScore(20.0))
+        assertEquals(0f, hardwareScore(5.0))
+        assertEquals(0f, hardwareScore(Double.NaN))
+        assertEquals(100f, hardwareScore(15_000.0))
+        assertEquals(100f, hardwareScore(40_000.0))
+        assertNear(21f, hardwareScore(80.0), 2f)
+        assertNear(35f, hardwareScore(200.0), 2f)
+        assertNear(49f, hardwareScore(500.0), 2f)
+        assertNear(65f, hardwareScore(1_500.0), 3f)
+        assertNear(83f, hardwareScore(5_000.0), 3f)
+    }
+
+    @Test
+    fun correctedVisitsPerSecSubtractsRtt() {
+        val fastRemote = correctedVisitsPerSec(2_000, elapsedMs = 250, rttMs = 200)
+        assertTrue(fastRemote in 30_000.0..45_000.0, "got $fastRemote")
+        val slowLocal = correctedVisitsPerSec(2_000, elapsedMs = 25_000, rttMs = 10)
+        assertTrue(slowLocal in 75.0..85.0, "got $slowLocal")
+        assertEquals(2_000_000.0, correctedVisitsPerSec(2_000, elapsedMs = 200, rttMs = 200))
+    }
+
+    @Test
+    fun highRttFastSearchIsDistantNetworkAndHighHardware() {
         val report = assembleReport(
-            policyMs = policy,
+            pingMs = List(20) { 220L },
+            pingOk = true,
+            policyMs = List(8) { 240L },
+            searches = listOf(
+                SearchSample(80, 80, 230),
+                SearchSample(400, 400, 250),
+                SearchSample(2_000, 2_000, 280),
+            ),
+            playVisits = 400,
+            humanMs = 240,
+            humanPolicyPresent = true,
+        )
+        assertEquals(NetworkVerdict.Distant, report.network.verdict)
+        assertEquals(220L, report.network.medianMs)
+        assertTrue(report.network.pingOk)
+        assertTrue(report.hardware.visitsPerSec > 20_000.0, "got ${report.hardware.visitsPerSec}")
+        assertTrue(report.hardware.score >= 90f, "got ${report.hardware.score}")
+        assertEquals(HardwareBand.HighEnd, report.hardware.band)
+        assertEquals(PlayFeel.GpuPlentyNetworkWaits, report.feel)
+    }
+
+    @Test
+    fun lowRttSlowSearchIsLocalNetworkAndWeakHardware() {
+        val report = assembleReport(
+            pingMs = List(20) { 8L },
+            pingOk = true,
+            policyMs = List(8) { 90L },
+            searches = listOf(
+                SearchSample(80, 80, 3_000),
+                SearchSample(400, 400, 12_000),
+                SearchSample(2_000, 2_000, 60_000),
+            ),
+            playVisits = 400,
+            humanMs = null,
+            humanPolicyPresent = false,
+        )
+        assertEquals(NetworkVerdict.Local, report.network.verdict)
+        assertEquals(8L, report.network.medianMs)
+        assertTrue(report.hardware.visitsPerSec in 30.0..40.0, "got ${report.hardware.visitsPerSec}")
+        assertTrue(report.hardware.score < 20f, "got ${report.hardware.score}")
+        assertEquals(HardwareBand.WeakCpu, report.hardware.band)
+        assertEquals(PlayFeel.NetworkLocalSearchLimits, report.feel)
+        assertFalse(report.humanPolicyPresent)
+    }
+
+    @Test
+    fun pingFailureFallsBackToSearchSlope() {
+        val report = assembleReport(
+            pingMs = emptyList(),
+            pingOk = false,
+            policyMs = List(8) { 70L },
+            searches = listOf(
+                SearchSample(80, 80, 50),
+                SearchSample(400, 400, 220),
+                SearchSample(2_000, 2_000, 1_000),
+            ),
+            playVisits = 400,
+            humanMs = 94,
+            humanPolicyPresent = true,
+        )
+        assertFalse(report.network.pingOk)
+        assertTrue(report.network.rttMs.isEmpty())
+        val slope = rttFromSearchSlope(report.hardware.searches)
+        assertEquals(slope, report.network.medianMs)
+        assertTrue(report.hardware.visitsPerSec > 1_500.0)
+        assertEquals(PlayFeel.BothComfortable, report.feel)
+    }
+
+    @Test
+    fun bothTightWhenDistantAndWeak() {
+        val report = assembleReport(
+            pingMs = List(20) { 400L },
+            pingOk = true,
+            policyMs = List(8) { 450L },
+            searches = listOf(
+                SearchSample(80, 80, 3_400),
+                SearchSample(400, 400, 12_400),
+                SearchSample(2_000, 2_000, 60_400),
+            ),
+            playVisits = 400,
+            humanMs = null,
+            humanPolicyPresent = false,
+        )
+        assertEquals(NetworkVerdict.HighDelay, report.network.verdict)
+        assertTrue(report.hardware.score < 20f)
+        assertEquals(PlayFeel.BothTight, report.feel)
+    }
+
+    @Test
+    fun localFastIsComfortable() {
+        val report = assembleReport(
+            pingMs = List(20) { 12L },
+            pingOk = true,
+            policyMs = List(8) { 70L },
             searches = listOf(
                 SearchSample(80, 80, 50),
                 SearchSample(400, 400, 300),
@@ -50,18 +162,14 @@ class EngineBenchmarkTest {
             humanMs = 94,
             humanPolicyPresent = true,
         )
+        assertEquals(NetworkVerdict.Local, report.network.verdict)
+        assertEquals(12L, report.network.medianMs)
         assertEquals(70L, report.policyMedianMs)
-        assertEquals(70L, report.policyMinMs)
-        assertEquals(70L, report.policyMaxMs)
-        assertEquals(BenchmarkVerdict.Excellent, report.verdict)
-        assertEquals(3, report.searches.size)
-        assertEquals(80, report.searches[0].requestedVisits)
-        assertEquals(400, report.searches[1].requestedVisits)
-        assertEquals(2_000, report.searches[2].requestedVisits)
-        assertTrue(report.searches[1].visitsPerSec in 1_300.0..1_400.0)
-        assertEquals(300L, report.playVisitsEtaMs)
-        assertEquals(94L, report.humanMs)
+        assertEquals(PlayFeel.BothComfortable, report.feel)
+        assertTrue(report.hardware.score > 55f)
+        assertEquals(3, report.hardware.searches.size)
         assertTrue(report.humanPolicyPresent)
+        assertEquals(94L, report.humanMs)
     }
 
     @Test
@@ -76,33 +184,22 @@ class EngineBenchmarkTest {
         assertEquals("1290", formatRate(1290.4))
         assertEquals("—", formatRate(0.0))
         assertEquals("—", formatRate(Double.NaN))
-    }
-
-    @Test
-    fun missingHumanNetDoesNotChangeVerdict() {
-        val report = assembleReport(
-            policyMs = List(30) { 200L },
-            searches = listOf(
-                SearchSample(80, 80, 200),
-                SearchSample(400, 400, 1_000),
-                SearchSample(2_000, 2_000, 4_000),
-            ),
-            playVisits = 500,
-            humanMs = null,
-            humanPolicyPresent = false,
-        )
-        assertEquals(BenchmarkVerdict.Smooth, report.verdict)
-        assertEquals(false, report.humanPolicyPresent)
-        assertEquals(null, report.humanMs)
-        assertTrue(report.playVisitsEtaMs in 1_200L..1_300L)
+        assertEquals("0", formatScore(0f))
+        assertEquals("100", formatScore(100f))
+        assertEquals("67", formatScore(66.6f))
     }
 
     @Test
     fun searchLadderAndTimeoutsMatchFiveXStress() {
         assertEquals(listOf(80, 400, 2_000), BENCH_SEARCH_LADDER)
-        assertEquals(30, BENCH_POLICY_SAMPLES)
+        assertEquals(8, BENCH_POLICY_SAMPLES)
+        assertEquals(20, BENCH_PING_SAMPLES)
         assertEquals(24_000L, benchSearchTimeoutMs(80))
         assertEquals(40_000L, benchSearchTimeoutMs(400))
         assertEquals(120_000L, benchSearchTimeoutMs(2_000))
+    }
+
+    private fun assertNear(expected: Float, actual: Float, delta: Float) {
+        assertTrue(abs(expected - actual) <= delta, "expected $expected ± $delta, got $actual")
     }
 }

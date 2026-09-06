@@ -43,6 +43,7 @@ class GameTree(
         private set
 
     private var nextId = 1L
+    private var lastLeafId: String = root.id
 
     val ended: Boolean get() = current.position.consecutivePasses >= 2
 
@@ -77,6 +78,34 @@ class GameTree(
         return acc
     }
 
+    /** Most recently occupied leaf, or the preferred continuation if still on an interior node. */
+    fun lastLeaf(): Node = nodeById(lastLeafId) ?: leafFrom(current)
+
+    /** Jump to [lastLeaf]. Clears review when that node is a leaf. */
+    fun resumeLeaf(): Boolean {
+        val target = lastLeaf()
+        if (current === target) return false
+        return goTo(target.id)
+    }
+
+    /** Prefer the continuation leaf from [current] when loading a tree mid-review. */
+    fun syncResumeLeaf() {
+        lastLeafId = leafFrom(current).id
+    }
+
+    private fun leafFrom(start: Node): Node {
+        var node = start
+        while (node.children.isNotEmpty()) {
+            val i = node.preferredChild.coerceIn(0, node.children.lastIndex)
+            node = node.children[i]
+        }
+        return node
+    }
+
+    private fun rememberLeaf() {
+        if (current.children.isEmpty()) lastLeafId = current.id
+    }
+
     fun play(point: Point): PlayResult {
         val result = Rules.tryPlay(current.position, point)
         if (result is PlayResult.Ok) {
@@ -96,6 +125,7 @@ class GameTree(
     fun undo(): Boolean {
         val parent = current.parent ?: return false
         current = parent
+        rememberLeaf()
         return true
     }
 
@@ -103,6 +133,7 @@ class GameTree(
         if (current.children.isEmpty()) return false
         val i = current.preferredChild.coerceIn(0, current.children.lastIndex)
         current = current.children[i]
+        rememberLeaf()
         return true
     }
 
@@ -111,6 +142,7 @@ class GameTree(
         while (current !== node && current.parent != null && guard++ < 10_000) {
             current = current.parent!!
         }
+        rememberLeaf()
         return current === node
     }
 
@@ -131,6 +163,7 @@ class GameTree(
             parent.preferredChild = idx
         }
         current = target
+        rememberLeaf()
         return true
     }
 
@@ -142,6 +175,7 @@ class GameTree(
         val next = (idx + delta).mod(parent.children.size)
         parent.preferredChild = next
         current = parent.children[next]
+        rememberLeaf()
         return true
     }
 
@@ -169,10 +203,14 @@ class GameTree(
     fun applyChildPath(path: List<Int>): Boolean {
         current = root
         for (index in path) {
-            if (index !in current.children.indices) return false
+            if (index !in current.children.indices) {
+                syncResumeLeaf()
+                return false
+            }
             current.preferredChild = index
             current = current.children[index]
         }
+        syncResumeLeaf()
         return true
     }
 
@@ -194,6 +232,7 @@ class GameTree(
         if (existingIndex >= 0) {
             current.preferredChild = existingIndex
             current = current.children[existingIndex]
+            rememberLeaf()
             return
         }
         val node = Node(
@@ -205,5 +244,6 @@ class GameTree(
         current.children.add(node)
         current.preferredChild = current.children.lastIndex
         current = node
+        rememberLeaf()
     }
 }

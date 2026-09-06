@@ -360,6 +360,28 @@ class AnalysisClient(
                 return BenchmarkResult.Fail(warmup.error)
             }
 
+            val pingMs = ArrayList<Long>(BENCH_PING_SAMPLES)
+            var pingOk = true
+            for (i in 0 until BENCH_PING_SAMPLES) {
+                if (!pingOk) break
+                onStep(BenchmarkStep.Ping(i + 1, BENCH_PING_SAMPLES))
+                val pingId = "bench:ping:$i:${nonce()}"
+                val pingMark = TimeSource.Monotonic.markNow()
+                val ping = queryOnce(
+                    pingId,
+                    analysisJson.encodeToString(VersionQuery.serializer(), buildBenchPingQuery(pingId)),
+                    BENCH_POLICY_TIMEOUT_MS,
+                )
+                if (ping.error != null) {
+                    pingOk = pingMs.isNotEmpty()
+                    if (!pingOk) pingMs.clear()
+                    break
+                }
+                pingMs += pingMark.elapsedNow().inWholeMilliseconds.coerceAtLeast(1L)
+            }
+            pingOk = pingOk && pingMs.isNotEmpty()
+            if (!pingOk) pingMs.clear()
+
             val policyMs = ArrayList<Long>(BENCH_POLICY_SAMPLES)
             repeat(BENCH_POLICY_SAMPLES) { i ->
                 onStep(BenchmarkStep.Latency(i + 1, BENCH_POLICY_SAMPLES))
@@ -408,11 +430,13 @@ class AnalysisClient(
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
-                // Human net is optional; latency/search still decide the verdict.
+                // Human net is optional; network and hardware scores still stand.
             }
 
             return BenchmarkResult.Ok(
                 assembleReport(
+                    pingMs = pingMs,
+                    pingOk = pingOk,
                     policyMs = policyMs,
                     searches = searches,
                     playVisits = playVisits.coerceAtLeast(1),
@@ -459,21 +483,26 @@ class AnalysisClient(
 
     private fun nonce(): String = Random.nextLong().toULong().toString(16)
 
-    private suspend fun queryOnce(query: AnalysisQuery, timeoutMs: Long): AnalysisResponse {
+    private suspend fun queryOnce(query: AnalysisQuery, timeoutMs: Long): AnalysisResponse =
+        queryOnce(
+            query.id,
+            analysisJson.encodeToString(AnalysisQuery.serializer(), query),
+            timeoutMs,
+        )
+
+    private suspend fun queryOnce(id: String, json: String, timeoutMs: Long): AnalysisResponse {
         val deferred = CompletableDeferred<AnalysisResponse>()
-        waitersMutex.withLock { waiters[query.id] = QueryWaiter.OneShot(deferred) }
+        waitersMutex.withLock { waiters[id] = QueryWaiter.OneShot(deferred) }
         try {
             awaitOnline()
-            sendMutex.withLock {
-                sendJson(analysisJson.encodeToString(AnalysisQuery.serializer(), query))
-            }
+            sendMutex.withLock { sendJson(json) }
             return try {
                 withTimeout(timeoutMs) { deferred.await() }
             } catch (e: TimeoutCancellationException) {
                 throw IllegalStateException("Timed out after ${timeoutMs / 1000}s")
             }
         } finally {
-            waitersMutex.withLock { waiters.remove(query.id) }
+            waitersMutex.withLock { waiters.remove(id) }
         }
     }
 

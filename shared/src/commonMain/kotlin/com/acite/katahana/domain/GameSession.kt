@@ -6,6 +6,10 @@ class GameSession(config: GameConfig, tree: GameTree? = null) {
 
     val tree: GameTree = tree ?: GameTree(size = config.boardSize, komi = config.komi)
 
+    init {
+        if (this.tree.reviewing) this.tree.syncResumeLeaf()
+    }
+
     val position: Position get() = tree.current.position
 
     val lastPlace: Point?
@@ -22,6 +26,8 @@ class GameSession(config: GameConfig, tree: GameTree? = null) {
     fun cycleVariation(delta: Int): Boolean = tree.cycleVariation(delta)
 
     fun goTo(id: String): Boolean = tree.goTo(id)
+
+    fun exitReview(): Boolean = tree.resumeLeaf()
 
     val reviewing: Boolean get() = tree.reviewing
 

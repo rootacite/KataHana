@@ -1,6 +1,7 @@
 package com.acite.katahana.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,7 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.acite.katahana.domain.rankLabel
 import com.acite.katahana.ui.Copy
-import com.acite.katahana.ui.theme.HanaColors
+import com.acite.katahana.ui.theme.hanaColors
 import kotlin.math.roundToInt
 
 @Composable
@@ -27,12 +28,15 @@ fun RankCard(
     emphasized: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
-    val bg = if (emphasized) HanaColors.accentPink else HanaColors.bgApp
-    val fg = if (emphasized) Color.White else HanaColors.accentLilac
+    val colors = hanaColors
+    val bg = if (emphasized) colors.accentPink.copy(alpha = 0.22f) else Color.White.copy(alpha = 0.05f)
+    val border = if (emphasized) colors.accentPink.copy(alpha = 0.40f) else Color.White.copy(alpha = 0.10f)
+    val fg = if (emphasized) colors.text else colors.accentLilac
     Box(
         modifier
             .clip(RoundedCornerShape(8.dp))
             .background(bg)
+            .border(1.dp, border, RoundedCornerShape(8.dp))
             .padding(horizontal = 10.dp, vertical = 4.dp),
     ) {
         Text(
@@ -51,6 +55,7 @@ fun RankLadder(
     onRankKyu: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val colors = hanaColors
     val label = if (godlike) Copy.katagoRankGod else rankLabel(rankKyu)
     Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
         RankCard(label, emphasized = godlike)
@@ -63,12 +68,12 @@ fun RankLadder(
             valueRange = 0f..17f,
             steps = 16,
             colors = SliderDefaults.colors(
-                thumbColor = HanaColors.accentPink,
-                activeTrackColor = HanaColors.accentPink,
-                inactiveTrackColor = HanaColors.stroke,
-                disabledThumbColor = HanaColors.accentPink,
-                disabledActiveTrackColor = HanaColors.accentPink,
-                disabledInactiveTrackColor = HanaColors.stroke.copy(alpha = 0.55f),
+                thumbColor = colors.accentPink,
+                activeTrackColor = colors.accentPink,
+                inactiveTrackColor = colors.stroke,
+                disabledThumbColor = colors.accentPink,
+                disabledActiveTrackColor = colors.accentPink,
+                disabledInactiveTrackColor = colors.stroke.copy(alpha = 0.55f),
             ),
         )
     }

@@ -52,7 +52,7 @@ import com.acite.katahana.ui.components.SaveNameDialog
 import com.acite.katahana.ui.components.WinrateTrack
 import com.acite.katahana.ui.navigation.HanaBackHandler
 import com.acite.katahana.ui.settings.SettingsScreen
-import com.acite.katahana.ui.theme.HanaColors
+import com.acite.katahana.ui.theme.hanaColors
 import com.acite.katahana.ui.theme.hanaTokens
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
@@ -164,13 +164,19 @@ private fun SessionRoute(vm: SessionViewModel) {
     BoxWithConstraints(
         Modifier
             .fillMaxSize()
-            .background(HanaColors.bgApp),
+            .background(hanaColors.bgApp),
     ) {
         val landscape = getPlatform().isMobile && maxWidth > maxHeight
         val chromePad = if (landscape) 4.dp else 8.dp
         val humanTurn = snapshot.humanControls && !snapshot.ended
         val hazeState = rememberHazeState()
-        Column(Modifier.fillMaxSize().padding(top = chromePad)) {
+        val overlayHaze = rememberHazeState()
+        Column(
+            Modifier
+                .fillMaxSize()
+                .padding(top = chromePad)
+                .hazeSource(overlayHaze),
+        ) {
             if (!landscape) {
                 SessionTopBar(
                     status = ui.engineStatus,
@@ -187,6 +193,7 @@ private fun SessionRoute(vm: SessionViewModel) {
                     onConfirm = vm::confirmSelected,
                     forecastActive = ui.forecast != null,
                     onEndForecast = vm::endForecast,
+                    onExitReview = vm::exitReview,
                 )
             }
             HanaDrawer(
@@ -223,6 +230,7 @@ private fun SessionRoute(vm: SessionViewModel) {
                         onConfirm = vm::confirmSelected,
                         forecastActive = ui.forecast != null,
                         onEndForecast = vm::endForecast,
+                        onExitReview = vm::exitReview,
                         onCycleVariation = vm::cycleVariation,
                         onGoToNode = vm::goToNode,
                         tree = ui.tree,
@@ -255,21 +263,12 @@ private fun SessionRoute(vm: SessionViewModel) {
                         .hazeSource(hazeState)
                         .padding(chromePad),
                 ) {
-                    val railTaken = if (landscape) SessionRailWidth + chromePad else 0.dp
-                    val fullSquare = minOf(maxWidth, maxHeight).coerceAtLeast(120.dp)
-                    val boardSide =
-                        if (landscape && maxWidth - fullSquare < railTaken) {
-                            minOf(maxHeight, maxWidth - railTaken).coerceAtLeast(120.dp)
-                        } else {
-                            fullSquare
-                        }
-                    val leftover = maxWidth - boardSide
-                    val treeW =
-                        if (leftover - railTaken >= 168.dp) {
-                            (leftover - railTaken).coerceAtMost(280.dp)
-                        } else {
-                            0.dp
-                        }
+                    val layout = computeSessionLayout(
+                        maxWidth = maxWidth,
+                        maxHeight = maxHeight,
+                        mobile = getPlatform().isMobile,
+                        chromePad = chromePad,
+                    )
                     val board: @Composable () -> Unit = {
                         BoardCanvas(
                             snapshot = snapshot,
@@ -279,7 +278,7 @@ private fun SessionRoute(vm: SessionViewModel) {
                             onActivate = vm::onActivate,
                             onAim = vm::onAim,
                             onForecast = vm::onForecast,
-                            modifier = Modifier.size(boardSide),
+                            modifier = Modifier.size(layout.boardSide),
                             candidates = boardCandidates,
                             qualities = boardQualities,
                             showConnections = showConnections,
@@ -291,13 +290,10 @@ private fun SessionRoute(vm: SessionViewModel) {
                             forecastRevealed = ui.forecastRevealed,
                         )
                     }
-                    if (treeW > 0.dp || landscape) {
-                        Row(
-                            Modifier.fillMaxSize(),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            if (treeW > 0.dp) {
-                                SessionTreeColumn(
+                    when {
+                        layout.showTopTree -> {
+                            Column(Modifier.fillMaxSize()) {
+                                SessionTreeRow(
                                     layout = ui.tree,
                                     reviewing = snapshot.reviewing,
                                     onGoToNode = vm::goToNode,
@@ -307,68 +303,106 @@ private fun SessionRoute(vm: SessionViewModel) {
                                     onGraphMode = vm::setEvalGraphMode,
                                     stats = ui.qualityStats,
                                     modifier = Modifier
-                                        .width(treeW)
-                                        .fillMaxHeight(),
+                                        .fillMaxWidth()
+                                        .height(layout.treeH),
                                 )
-                                Spacer(Modifier.width(chromePad))
+                                Spacer(Modifier.height(chromePad))
+                                Box(
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .weight(1f),
+                                    contentAlignment = Alignment.BottomCenter,
+                                ) { board() }
                             }
-                            if (landscape) {
-                                SessionRail(
-                                    status = ui.engineStatus,
-                                    blackWinrate = ui.blackWinrate?.toFloat(),
-                                    reviewing = snapshot.reviewing,
-                                    onMenu = { drawerOpen = true },
-                                    snapshot = snapshot,
-                                    hasSelection = ui.selected != null,
-                                    humanTurn = humanTurn,
-                                    onPass = vm::pass,
-                                    onUndo = vm::undo,
-                                    onRedo = vm::redo,
-                                    onConfirm = vm::confirmSelected,
-                                    forecastActive = ui.forecast != null,
-                                    onEndForecast = vm::endForecast,
-                                    modifier = Modifier
-                                        .width(SessionRailWidth)
-                                        .fillMaxHeight(),
-                                )
-                                Spacer(Modifier.width(chromePad))
+                        }
+                        layout.showSideTree || layout.showRail -> {
+                            Row(
+                                Modifier.fillMaxSize(),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                if (layout.showSideTree) {
+                                    SessionTreeColumn(
+                                        layout = ui.tree,
+                                        reviewing = snapshot.reviewing,
+                                        onGoToNode = vm::goToNode,
+                                        samples = ui.evalSamples,
+                                        currentMoveNumber = snapshot.moveNumber,
+                                        graphMode = ui.evalGraphMode,
+                                        onGraphMode = vm::setEvalGraphMode,
+                                        stats = ui.qualityStats,
+                                        modifier = Modifier
+                                            .width(layout.treeW)
+                                            .fillMaxHeight(),
+                                    )
+                                    Spacer(Modifier.width(chromePad))
+                                }
+                                if (layout.showRail) {
+                                    SessionRail(
+                                        status = ui.engineStatus,
+                                        blackWinrate = ui.blackWinrate?.toFloat(),
+                                        reviewing = snapshot.reviewing,
+                                        onMenu = { drawerOpen = true },
+                                        snapshot = snapshot,
+                                        hasSelection = ui.selected != null,
+                                        humanTurn = humanTurn,
+                                        onPass = vm::pass,
+                                        onUndo = vm::undo,
+                                        onRedo = vm::redo,
+                                        onConfirm = vm::confirmSelected,
+                                        forecastActive = ui.forecast != null,
+                                        onEndForecast = vm::endForecast,
+                                        onExitReview = vm::exitReview,
+                                        modifier = Modifier
+                                            .width(SessionRailWidth)
+                                            .fillMaxHeight(),
+                                    )
+                                    Spacer(Modifier.width(chromePad))
+                                }
+                                Box(
+                                    Modifier.weight(1f).fillMaxHeight(),
+                                    contentAlignment = Alignment.Center,
+                                ) { board() }
                             }
+                        }
+                        else -> {
                             Box(
-                                Modifier.weight(1f).fillMaxHeight(),
-                                contentAlignment = Alignment.Center,
+                                Modifier.fillMaxSize(),
+                                contentAlignment = if (maxHeight >= maxWidth) {
+                                    Alignment.BottomCenter
+                                } else {
+                                    Alignment.Center
+                                },
                             ) { board() }
                         }
-                    } else {
-                        Box(
-                            Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center,
-                        ) { board() }
                     }
                 }
             }
         }
-    }
-    if (leaveAsk) {
-        LeaveGameDialog(
-            onSave = { performSave(true) },
-            onDiscard = actuallyLeave,
-            onCancel = { leaveAsk = false },
-        )
-    }
-    if (nameAsk) {
-        SaveNameDialog(
-            initial = nameDraft,
-            onConfirm = { performSaveAs(it, nameThenLeave) },
-            onCancel = { nameAsk = false },
-        )
-    }
-    editColor?.let { color ->
-        SeatDialog(
-            color = color,
-            seat = snapshot.seat(color),
-            onChange = { vm.setSeat(color, it) },
-            onDismiss = { editColor = null },
-        )
+        if (leaveAsk) {
+            LeaveGameDialog(
+                onSave = { performSave(true) },
+                onDiscard = actuallyLeave,
+                onCancel = { leaveAsk = false },
+                hazeState = overlayHaze,
+            )
+        }
+        if (nameAsk) {
+            SaveNameDialog(
+                initial = nameDraft,
+                onConfirm = { performSaveAs(it, nameThenLeave) },
+                onCancel = { nameAsk = false },
+                hazeState = overlayHaze,
+            )
+        }
+        editColor?.let { color ->
+            SeatDialog(
+                color = color,
+                seat = snapshot.seat(color),
+                onChange = { vm.setSeat(color, it) },
+                onDismiss = { editColor = null },
+                hazeState = overlayHaze,
+            )
+        }
     }
 }
 
@@ -386,6 +420,7 @@ internal fun SessionTopBar(
     onConfirm: () -> Unit,
     forecastActive: Boolean = false,
     onEndForecast: () -> Unit = {},
+    onExitReview: () -> Unit = {},
     reviewing: Boolean = false,
     compact: Boolean = false,
 ) {
@@ -415,14 +450,13 @@ internal fun SessionTopBar(
             onConfirm = onConfirm,
             forecastActive = forecastActive,
             onEndForecast = onEndForecast,
+            onExitReview = onExitReview,
         )
         if (reviewing) {
-            ReviewChip(compact = compact, onClick = onMenu)
+            ReviewChip(compact = compact, onClick = onExitReview)
         }
     }
 }
-
-private val SessionRailWidth = 64.dp
 
 @Composable
 private fun SessionRail(
@@ -439,6 +473,7 @@ private fun SessionRail(
     onConfirm: () -> Unit,
     forecastActive: Boolean = false,
     onEndForecast: () -> Unit = {},
+    onExitReview: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -449,7 +484,7 @@ private fun SessionRail(
         EngineDot(online = status.online)
         MenuChip(compact = true, onClick = onMenu)
         if (reviewing) {
-            ReviewChip(compact = true, onClick = onMenu)
+            ReviewChip(compact = true, onClick = onExitReview)
         }
         WinrateTrack(
             Modifier
@@ -470,6 +505,7 @@ private fun SessionRail(
             onConfirm = onConfirm,
             forecastActive = forecastActive,
             onEndForecast = onEndForecast,
+            onExitReview = onExitReview,
             vertical = true,
         )
     }
@@ -480,7 +516,7 @@ private fun MenuChip(compact: Boolean, onClick: () -> Unit) {
     if (compact) {
         Text(
             Copy.menu,
-            color = HanaColors.accentLilac,
+            color = hanaColors.accentLilac,
             fontSize = 12.sp,
             fontWeight = FontWeight.Medium,
             textAlign = TextAlign.Center,
@@ -500,7 +536,7 @@ private fun ReviewChip(compact: Boolean, onClick: () -> Unit) {
     Box(
         Modifier
             .clip(hanaTokens.capsule)
-            .background(HanaColors.accentPink.copy(alpha = 0.18f))
+            .background(hanaColors.accentPink.copy(alpha = 0.18f))
             .clickable(onClick = onClick)
             .padding(
                 horizontal = if (compact) 4.dp else 10.dp,
@@ -508,8 +544,8 @@ private fun ReviewChip(compact: Boolean, onClick: () -> Unit) {
             ),
     ) {
         Text(
-            Copy.review,
-            color = HanaColors.accentPink,
+            Copy.exitReview,
+            color = hanaColors.accentPink,
             fontSize = if (compact) 11.sp else 12.sp,
             fontWeight = FontWeight.SemiBold,
             textAlign = TextAlign.Center,

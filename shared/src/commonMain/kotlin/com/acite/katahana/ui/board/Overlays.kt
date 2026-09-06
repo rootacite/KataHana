@@ -88,21 +88,27 @@ fun DrawScope.drawOwnershipLayer(
     centerOf: (Point) -> Offset,
     style: OwnershipStyle = OwnershipStyle.Blocks,
     motion: OwnershipMotion = OwnershipMotion.Still,
+    ownBlue: Color = HanaColors.accentBlue,
+    ownPink: Color = HanaColors.accentPink,
 ) {
     if (values.size != boardSize * boardSize) return
     when (style) {
-        OwnershipStyle.Blocks -> drawOwnershipBlocks(values, boardSize, gap, centerOf, motion.bounce)
-        OwnershipStyle.Fog -> drawOwnershipFog(values, boardSize, gap, centerOf, motion.drift)
+        OwnershipStyle.Blocks -> drawOwnershipBlocks(
+            values, boardSize, gap, centerOf, motion.bounce, ownBlue, ownPink,
+        )
+        OwnershipStyle.Fog -> drawOwnershipFog(
+            values, boardSize, gap, centerOf, motion.drift, ownBlue, ownPink,
+        )
         OwnershipStyle.Constellation -> drawOwnershipConstellation(
-            values, boardSize, gap, centerOf, motion.breath, motion.twinkle,
+            values, boardSize, gap, centerOf, motion.breath, motion.twinkle, ownBlue, ownPink,
         )
     }
 }
 
 private const val OWNERSHIP_ALPHA = 0.5f * 0.65f
 
-private fun ownershipTint(v: Float): Color =
-    if (v >= 0f) HanaColors.accentBlue else HanaColors.accentPink
+private fun ownershipTint(v: Float, ownBlue: Color, ownPink: Color): Color =
+    if (v >= 0f) ownBlue else ownPink
 
 private fun Color.haze(alpha: Float): Color = copy(alpha = alpha * OWNERSHIP_ALPHA)
 
@@ -112,6 +118,8 @@ private fun DrawScope.drawOwnershipBlocks(
     gap: Float,
     centerOf: (Point) -> Offset,
     bounce: Float,
+    ownBlue: Color,
+    ownPink: Color,
 ) {
     val cell = gap * 0.82f
     val corner = cell * 0.28f
@@ -127,7 +135,7 @@ private fun DrawScope.drawOwnershipBlocks(
             val alpha = (0.10f + 0.48f * abs(v)).coerceIn(0.10f, 0.58f)
             val c = centerOf(Point(x, y))
             drawRoundRect(
-                color = ownershipTint(v).haze(alpha),
+                color = ownershipTint(v, ownBlue, ownPink).haze(alpha),
                 topLeft = Offset(c.x - s / 2f, c.y - s / 2f + lift),
                 size = Size(s, s),
                 cornerRadius = CornerRadius(corner * scale, corner * scale),
@@ -144,10 +152,12 @@ private fun DrawScope.drawOwnershipFog(
     gap: Float,
     centerOf: (Point) -> Offset,
     drift: Float,
+    ownBlue: Color,
+    ownPink: Color,
 ) {
     if (boardSize < 2) return
-    drawFogLayer(values, boardSize, gap, centerOf, drift, layer = 0, alphaScale = 1f)
-    drawFogLayer(values, boardSize, gap, centerOf, drift, layer = 1, alphaScale = 0.42f)
+    drawFogLayer(values, boardSize, gap, centerOf, drift, layer = 0, alphaScale = 1f, ownBlue, ownPink)
+    drawFogLayer(values, boardSize, gap, centerOf, drift, layer = 1, alphaScale = 0.42f, ownBlue, ownPink)
 }
 
 private fun DrawScope.drawFogLayer(
@@ -158,6 +168,8 @@ private fun DrawScope.drawFogLayer(
     drift: Float,
     layer: Int,
     alphaScale: Float,
+    ownBlue: Color,
+    ownPink: Color,
 ) {
     val tau = (drift + if (layer == 0) 0f else 0.37f) * TWO_PI
     val swayX = gap * 0.11f * sin(tau + layer * 1.7f)
@@ -188,7 +200,7 @@ private fun DrawScope.drawFogLayer(
                     val px = originX + spanX * (ix / FOG_STEPS.toFloat()) + swayX
                     val py = originY + spanY * (iy / FOG_STEPS.toFloat()) + swayY
                     drawRect(
-                        color = ownershipTint(sample).haze(
+                        color = ownershipTint(sample, ownBlue, ownPink).haze(
                             (0.045f + 0.20f * density) * alphaScale,
                         ),
                         topLeft = Offset(px - pad, py - pad),
@@ -234,6 +246,8 @@ private fun DrawScope.drawOwnershipConstellation(
     centerOf: (Point) -> Offset,
     breath: Float,
     twinkle: Float,
+    ownBlue: Color,
+    ownPink: Color,
 ) {
     val faceCut = 0.36f
     val lineCut = 0.26f
@@ -252,7 +266,7 @@ private fun DrawScope.drawOwnershipConstellation(
             val p0 = centerOf(Point(x, y))
             val p1 = centerOf(Point(x + 1, y + 1))
             drawRoundRect(
-                color = ownershipTint(a).haze((0.07f + 0.16f * mag) * inhale),
+                color = ownershipTint(a, ownBlue, ownPink).haze((0.07f + 0.16f * mag) * inhale),
                 topLeft = Offset(min(p0.x, p1.x), min(p0.y, p1.y)),
                 size = Size(abs(p1.x - p0.x), abs(p1.y - p0.y)),
                 cornerRadius = CornerRadius(gap * 0.18f, gap * 0.18f),
@@ -269,7 +283,7 @@ private fun DrawScope.drawOwnershipConstellation(
         val phase = fract(x0 * 0.21f + y0 * 0.34f + x1 * 0.17f + y1 * 0.09f)
         val pulse = inhale * (0.82f + 0.18f * flash(twinkle, phase))
         drawLine(
-            color = ownershipTint(a).haze((0.22f + 0.50f * mag) * pulse),
+            color = ownershipTint(a, ownBlue, ownPink).haze((0.22f + 0.50f * mag) * pulse),
             start = centerOf(Point(x0, y0)),
             end = centerOf(Point(x1, y1)),
             strokeWidth = ((1.3f + 1.7f * mag) * inhale).coerceAtLeast(1.1f),
@@ -296,7 +310,7 @@ private fun DrawScope.drawOwnershipConstellation(
             val mag = abs(v)
             if (mag < starCut) continue
             val c = centerOf(Point(x, y))
-            val tint = ownershipTint(v)
+            val tint = ownershipTint(v, ownBlue, ownPink)
             val phase = fract(x * 0.41f + y * 0.27f + 0.13f * x * y)
             val spark = flash(twinkle, phase)
             val r = gap * (0.07f + 0.16f * mag) * (0.88f + 0.16f * breath)
@@ -338,9 +352,9 @@ private fun peak(u: Float, width: Float): Float {
     return x * x
 }
 
-fun DrawScope.drawHoshi(center: Offset, radius: Float) {
+fun DrawScope.drawHoshi(center: Offset, radius: Float, color: Color = HanaColors.star) {
     drawCircle(
-        color = HanaColors.star,
+        color = color,
         radius = radius,
         center = center,
     )
@@ -359,14 +373,14 @@ fun candidateColorForLoss(pointsLost: Double): Color = when {
 fun candidateLabelColor(pointsLost: Double): Color =
     if (pointsLost >= 0.5 && pointsLost < 3.0) Color(0xFF1A1228) else Color.White
 
-fun qualityDotColor(band: QualityBand): Color = when (band) {
+fun qualityDotColor(band: QualityBand, shallow: Color = HanaColors.accentLilac): Color = when (band) {
     QualityBand.Blunder -> HanaColors.qualityPurple
     QualityBand.BigMistake -> HanaColors.qualityRed
     QualityBand.Mistake -> HanaColors.qualityOrange
     QualityBand.Inaccuracy -> HanaColors.qualityYellow
     QualityBand.Fair -> HanaColors.qualityMint
     QualityBand.Good -> HanaColors.qualityGreen
-    QualityBand.Shallow -> HanaColors.accentLilac.copy(alpha = 0.55f)
+    QualityBand.Shallow -> shallow.copy(alpha = 0.55f)
 }
 
 fun DrawScope.drawQualityDot(center: Offset, stoneRadius: Float, color: Color) {

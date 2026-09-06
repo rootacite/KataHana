@@ -29,7 +29,6 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
@@ -49,8 +48,9 @@ import kotlin.math.roundToInt
 import com.acite.katahana.domain.TreeLayout
 import com.acite.katahana.domain.TreeLayoutNode
 import com.acite.katahana.ui.Copy
-import com.acite.katahana.ui.theme.HanaColors
+import com.acite.katahana.ui.components.FrostedSurface
 import com.acite.katahana.ui.theme.hanaAppearance
+import com.acite.katahana.ui.theme.hanaColors
 import com.acite.katahana.ui.theme.hanaTokens
 
 private val CellW = 40.dp
@@ -64,18 +64,19 @@ fun GameTreeCard(
     modifier: Modifier = Modifier,
     compact: Boolean = false,
 ) {
-    val tokens = hanaTokens
-    Column(
-        modifier
-            .then(if (compact) Modifier.fillMaxHeight() else Modifier)
-            .clip(tokens.card)
-            .background(HanaColors.bgPanel)
-            .padding(if (compact) 10.dp else 14.dp),
+    val colors = hanaColors
+    FrostedSurface(
+        modifier.then(if (compact) Modifier.fillMaxHeight() else Modifier),
     ) {
+        Column(
+            Modifier
+                .then(if (compact) Modifier.fillMaxHeight() else Modifier)
+                .padding(if (compact) 10.dp else 14.dp),
+        ) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Text(
                 Copy.gameTree,
-                color = HanaColors.text,
+                color = colors.text,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.weight(1f),
@@ -83,7 +84,7 @@ fun GameTreeCard(
             if (reviewing) {
                 Text(
                     Copy.review,
-                    color = HanaColors.accentPink,
+                    color = colors.accentPink,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.SemiBold,
                 )
@@ -91,7 +92,7 @@ fun GameTreeCard(
         }
         if (reviewing) {
             Spacer(Modifier.height(6.dp))
-            Text(Copy.reviewHint, color = HanaColors.textDim, fontSize = 11.sp, lineHeight = 14.sp)
+            Text(Copy.reviewHint, color = colors.textDim, fontSize = 11.sp, lineHeight = 14.sp)
         }
         Spacer(Modifier.height(10.dp))
         GameTreeGraph(
@@ -101,6 +102,7 @@ fun GameTreeCard(
                 .fillMaxWidth()
                 .then(if (compact) Modifier.weight(1f) else Modifier.height(220.dp)),
         )
+        }
     }
 }
 
@@ -111,6 +113,7 @@ private fun GameTreeGraph(
     modifier: Modifier = Modifier,
 ) {
     val appearance = hanaAppearance
+    val colors = hanaColors
     val density = LocalDensity.current
     val goTo by rememberUpdatedState(onGoToNode)
     val tree by rememberUpdatedState(layout)
@@ -122,7 +125,7 @@ private fun GameTreeGraph(
         modifier
             .clipToBounds()
             .clip(hanaTokens.panel)
-            .background(HanaColors.bgCard),
+            .background(colors.bgCard),
     ) {
         val maxX = (with(density) { width.toPx() } - constraints.maxWidth).coerceAtLeast(0f)
         val maxY = (with(density) { height.toPx() } - constraints.maxHeight).coerceAtLeast(0f)
@@ -212,9 +215,9 @@ private fun GameTreeGraph(
                     val from = center(parent)
                     val to = center(node)
                     val color = if (node.onActiveLine) {
-                        HanaColors.accentLilac.copy(alpha = if (node.isFuture) 0.4f else 0.9f)
+                        colors.accentLilac.copy(alpha = 0.9f)
                     } else {
-                        HanaColors.stroke
+                        colors.stroke
                     }
                     val stroke = if (node.onActiveLine) 2.4.dp.toPx() else 1.4.dp.toPx()
                     if (parent.row == node.row) {
@@ -234,9 +237,9 @@ private fun GameTreeGraph(
                         node = node,
                         fill = node.color?.let { appearance.swatch(it).fill } ?: Color.Transparent,
                         rim = when {
-                            node.isCurrent -> HanaColors.accentPink
+                            node.isCurrent -> colors.accentPink
                             node.color != null -> appearance.swatch(node.color).rim
-                            else -> HanaColors.accentLilac
+                            else -> colors.accentLilac
                         },
                         modifier = Modifier.offset(x = CellW * node.col, y = CellH * node.row),
                     )
@@ -253,12 +256,10 @@ private fun TreeNodeChip(
     rim: Color,
     modifier: Modifier = Modifier,
 ) {
-    val alpha = if (node.isFuture) 0.42f else 1f
+    val colors = hanaColors
     val dot: Dp = if (node.isCurrent) 24.dp else 20.dp
     Column(
-        modifier
-            .size(CellW, CellH)
-            .alpha(alpha),
+        modifier.size(CellW, CellH),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box(
@@ -273,14 +274,14 @@ private fun TreeNodeChip(
                     Modifier
                         .size(6.dp)
                         .clip(CircleShape)
-                        .background(HanaColors.accentLilac.copy(alpha = 0.85f)),
+                        .background(colors.accentLilac.copy(alpha = 0.85f)),
                 )
             }
         }
         Spacer(Modifier.height(2.dp))
         Text(
             node.label,
-            color = if (node.isCurrent) HanaColors.accentPink else HanaColors.textDim,
+            color = if (node.isCurrent) colors.accentPink else colors.textDim,
             fontSize = 9.sp,
             fontWeight = if (node.isCurrent) FontWeight.SemiBold else FontWeight.Normal,
             maxLines = 1,

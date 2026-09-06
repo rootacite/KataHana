@@ -521,6 +521,13 @@ class SessionViewModel(
         if (session.goTo(id)) publish()
     }
 
+    fun exitReview() {
+        if (!session.reviewing) return
+        if (!humanControls()) return
+        bumpNav()
+        if (session.exitReview()) publish()
+    }
+
     fun sgfText(): String {
         val cfg = session.config
         return writeSgf(session.tree, cfg, seatSgfName(cfg.black), seatSgfName(cfg.white))

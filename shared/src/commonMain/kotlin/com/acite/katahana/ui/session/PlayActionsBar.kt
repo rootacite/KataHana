@@ -29,7 +29,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.acite.katahana.domain.SessionSnapshot
 import com.acite.katahana.ui.Copy
-import com.acite.katahana.ui.theme.HanaColors
+import com.acite.katahana.ui.theme.hanaColors
 
 @Composable
 fun PlayActionsBar(
@@ -42,6 +42,7 @@ fun PlayActionsBar(
     onConfirm: () -> Unit,
     forecastActive: Boolean = false,
     onEndForecast: () -> Unit = {},
+    onExitReview: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -52,6 +53,9 @@ fun PlayActionsBar(
         PlayGlyphButton(PlayGlyph.Pass, Copy.pass, humanTurn, onPass)
         PlayGlyphButton(PlayGlyph.Undo, Copy.undo, snapshot.humanControls && snapshot.canUndo, onUndo)
         PlayGlyphButton(PlayGlyph.Redo, Copy.redo, snapshot.humanControls && snapshot.canRedo, onRedo)
+        if (snapshot.reviewing) {
+            PlayGlyphButton(PlayGlyph.Resume, Copy.exitReview, true, onExitReview)
+        }
         if (forecastActive) {
             PlayGlyphButton(PlayGlyph.EndForecast, Copy.endForecast, true, onEndForecast)
         }
@@ -72,6 +76,7 @@ fun PlayIconCluster(
     onConfirm: () -> Unit,
     forecastActive: Boolean = false,
     onEndForecast: () -> Unit = {},
+    onExitReview: () -> Unit = {},
     modifier: Modifier = Modifier,
     vertical: Boolean = false,
 ) {
@@ -79,6 +84,9 @@ fun PlayIconCluster(
         PlayGlyphButton(PlayGlyph.Pass, Copy.pass, humanTurn, onPass)
         PlayGlyphButton(PlayGlyph.Undo, Copy.undo, snapshot.humanControls && snapshot.canUndo, onUndo)
         PlayGlyphButton(PlayGlyph.Redo, Copy.redo, snapshot.humanControls && snapshot.canRedo, onRedo)
+        if (snapshot.reviewing) {
+            PlayGlyphButton(PlayGlyph.Resume, Copy.exitReview, true, onExitReview)
+        }
         if (forecastActive) {
             PlayGlyphButton(PlayGlyph.EndForecast, Copy.endForecast, true, onEndForecast)
         }
@@ -103,7 +111,7 @@ fun PlayIconCluster(
     }
 }
 
-private enum class PlayGlyph { Pass, Undo, Redo, Confirm, EndForecast }
+private enum class PlayGlyph { Pass, Undo, Redo, Confirm, EndForecast, Resume }
 
 @Composable
 private fun PlayGlyphButton(
@@ -114,12 +122,12 @@ private fun PlayGlyphButton(
     emphasized: Boolean = false,
 ) {
     val tint = when {
-        !enabled -> HanaColors.textDim.copy(alpha = 0.38f)
+        !enabled -> hanaColors.textDim.copy(alpha = 0.38f)
         emphasized -> Color.White
-        else -> HanaColors.accentLilac
+        else -> hanaColors.accentLilac
     }
     val bg = when {
-        emphasized && enabled -> HanaColors.accentPink
+        emphasized && enabled -> hanaColors.accentPink
         else -> Color.Transparent
     }
     Box(
@@ -180,6 +188,22 @@ private fun DrawScope.drawPlayGlyph(glyph: PlayGlyph, color: Color) {
                 color = color,
                 start = Offset(s * 0.78f, s * 0.22f),
                 end = Offset(s * 0.22f, s * 0.78f),
+                strokeWidth = stroke.width,
+                cap = StrokeCap.Round,
+            )
+        }
+        PlayGlyph.Resume -> {
+            val skip = Path().apply {
+                moveTo(s * 0.16f, s * 0.22f)
+                lineTo(s * 0.62f, s * 0.50f)
+                lineTo(s * 0.16f, s * 0.78f)
+                close()
+            }
+            drawPath(skip, color)
+            drawLine(
+                color = color,
+                start = Offset(s * 0.78f, s * 0.22f),
+                end = Offset(s * 0.78f, s * 0.78f),
                 strokeWidth = stroke.width,
                 cap = StrokeCap.Round,
             )

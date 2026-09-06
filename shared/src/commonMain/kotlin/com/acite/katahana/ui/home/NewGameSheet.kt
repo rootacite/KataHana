@@ -20,11 +20,11 @@ import com.acite.katahana.domain.AiStyle
 import com.acite.katahana.domain.GameConfig
 import com.acite.katahana.domain.PlayMode
 import com.acite.katahana.ui.Copy
-import com.acite.katahana.ui.components.CapsuleButton
 import com.acite.katahana.ui.components.CapsuleChoice
 import com.acite.katahana.ui.components.ChoiceRow
+import com.acite.katahana.ui.components.PorcelainButton
 import com.acite.katahana.ui.components.RankLadder
-import com.acite.katahana.ui.theme.HanaColors
+import com.acite.katahana.ui.theme.hanaColors
 
 @Composable
 fun NewGameSheet(
@@ -51,7 +51,7 @@ fun NewGameSheet(
             .padding(horizontal = 20.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Text(title, color = HanaColors.text, fontSize = 22.sp)
+        Text(title, color = hanaColors.text, fontSize = 22.sp)
         Label(Copy.boardSize)
         ChoiceRow {
             for (n in listOf(9, 13, 19)) {
@@ -100,7 +100,7 @@ fun NewGameSheet(
             }
         }
         Spacer(Modifier.height(4.dp))
-        CapsuleButton(
+        PorcelainButton(
             text = Copy.start,
             onClick = {
                 onStart(
@@ -123,5 +123,5 @@ fun NewGameSheet(
 
 @Composable
 private fun Label(text: String) {
-    Text(text, color = HanaColors.textDim, fontSize = 13.sp)
+    Text(text, color = hanaColors.textDim, fontSize = 13.sp)
 }

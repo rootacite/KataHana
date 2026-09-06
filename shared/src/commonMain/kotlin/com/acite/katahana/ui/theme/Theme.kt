@@ -4,46 +4,50 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
-
-private val HanaColorScheme = darkColorScheme(
-    primary = HanaColors.accentPink,
-    onPrimary = Color.White,
-    primaryContainer = HanaColors.bgCard,
-    onPrimaryContainer = HanaColors.text,
-    secondary = HanaColors.accentBlue,
-    onSecondary = HanaColors.bgApp,
-    secondaryContainer = HanaColors.bgPanel,
-    onSecondaryContainer = HanaColors.text,
-    tertiary = HanaColors.accentLilac,
-    onTertiary = HanaColors.bgApp,
-    background = HanaColors.bgApp,
-    onBackground = HanaColors.text,
-    surface = HanaColors.bgPanel,
-    onSurface = HanaColors.text,
-    surfaceVariant = HanaColors.bgCard,
-    onSurfaceVariant = HanaColors.textDim,
-    surfaceTint = Color.Transparent,
-    outline = HanaColors.stroke,
-    outlineVariant = HanaColors.stroke,
-    error = HanaColors.qualityRed,
-    onError = Color.White,
-    inverseSurface = HanaColors.text,
-    inverseOnSurface = HanaColors.bgApp,
-    inversePrimary = HanaColors.accentPink,
-)
 
 @Composable
 fun KataHanaTheme(
     appearance: Appearance = Appearance.SkySakura,
     content: @Composable () -> Unit,
 ) {
+    val palette = appearance.palette
+    val scheme = remember(palette) {
+        darkColorScheme(
+            primary = palette.accentPink,
+            onPrimary = Color.White,
+            primaryContainer = palette.bgCard,
+            onPrimaryContainer = palette.text,
+            secondary = palette.accentBlue,
+            onSecondary = palette.bgApp,
+            secondaryContainer = palette.bgPanel,
+            onSecondaryContainer = palette.text,
+            tertiary = palette.accentLilac,
+            onTertiary = palette.bgApp,
+            background = palette.bgApp,
+            onBackground = palette.text,
+            surface = palette.bgPanel,
+            onSurface = palette.text,
+            surfaceVariant = palette.bgCard,
+            onSurfaceVariant = palette.textDim,
+            surfaceTint = Color.Transparent,
+            outline = palette.stroke,
+            outlineVariant = palette.stroke,
+            error = palette.qualityRed,
+            onError = Color.White,
+            inverseSurface = palette.text,
+            inverseOnSurface = palette.bgApp,
+            inversePrimary = palette.accentPink,
+        )
+    }
     CompositionLocalProvider(
         LocalHanaTokens provides HanaTokens(),
         LocalAppearance provides appearance,
+        LocalHanaPalette provides palette,
     ) {
         MaterialTheme(
-            colorScheme = HanaColorScheme,
+            colorScheme = scheme,
             typography = HanaTypography,
             content = content,
         )

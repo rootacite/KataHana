@@ -24,7 +24,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
-import com.acite.katahana.ui.theme.HanaColors
+import com.acite.katahana.ui.theme.hanaColors
 import com.acite.katahana.ui.theme.hanaTokens
 import dev.chrisbanes.haze.HazeInput
 import dev.chrisbanes.haze.HazeState
@@ -52,7 +52,7 @@ fun HanaDrawer(
         onOpenChange(drawerState.isOpen)
     }
     val t = acrylic.coerceIn(0f, 1f)
-    val tint = HanaColors.bgPanel.copy(alpha = 0.38f + 0.34f * t)
+    val tint = hanaColors.bgPanel.copy(alpha = 0.38f + 0.34f * t)
     val blurStyle = HazeBlurStyle {
         blurEnabled(t > 0.02f)
         blurRadius((4f + 20f * t).dp)
@@ -122,7 +122,7 @@ internal fun DrawerHandle(
             .width(18.dp)
             .height(72.dp)
             .clip(RoundedCornerShape(topEnd = 14.dp, bottomEnd = 14.dp))
-            .background(HanaColors.bgPanel.copy(alpha = 0.72f))
+            .background(hanaColors.bgPanel.copy(alpha = 0.72f))
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
@@ -131,7 +131,7 @@ internal fun DrawerHandle(
                 .width(3.dp)
                 .height(28.dp)
                 .clip(tokens.capsule)
-                .background(HanaColors.accentPink.copy(alpha = 0.85f)),
+                .background(hanaColors.accentPink.copy(alpha = 0.85f)),
         )
     }
 }

@@ -110,4 +110,28 @@ class AnalysisDtoTest {
         assertTrue(encoded.contains("\"action\":\"terminate\""))
         assertTrue(encoded.contains("\"terminateId\":\"s:n1:live:ab\""))
     }
+
+    @Test
+    fun encodesQueryVersionWithoutBoardFields() {
+        val encoded = analysisJson.encodeToString(
+            VersionQuery.serializer(),
+            buildBenchPingQuery("bench:ping:0:ab"),
+        )
+        assertTrue(encoded.contains("\"id\":\"bench:ping:0:ab\""))
+        assertTrue(encoded.contains("\"action\":\"query_version\""))
+        assertFalse(encoded.contains("boardXSize"))
+        assertFalse(encoded.contains("maxVisits"))
+        assertFalse(encoded.contains("moves"))
+    }
+
+    @Test
+    fun parsesQueryVersionEcho() {
+        val json = """{"action":"query_version","id":"bench:ping:0:ab","version":"1.18.1","git_hash":"abc"}"""
+        val response = analysisJson.decodeFromString(AnalysisResponse.serializer(), json)
+        assertEquals("query_version", response.action)
+        assertEquals("bench:ping:0:ab", response.id)
+        assertEquals("1.18.1", response.version)
+        assertNull(response.rootInfo)
+        assertNull(response.error)
+    }
 }

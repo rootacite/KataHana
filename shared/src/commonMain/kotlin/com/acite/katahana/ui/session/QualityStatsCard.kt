@@ -28,9 +28,9 @@ import com.acite.katahana.domain.STAT_BANDS
 import com.acite.katahana.domain.StoneColor
 import com.acite.katahana.ui.Copy
 import com.acite.katahana.ui.board.qualityDotColor
-import com.acite.katahana.ui.theme.HanaColors
+import com.acite.katahana.ui.components.FrostedSurface
 import com.acite.katahana.ui.theme.hanaAppearance
-import com.acite.katahana.ui.theme.hanaTokens
+import com.acite.katahana.ui.theme.hanaColors
 
 @Composable
 fun QualityStatsCard(
@@ -38,17 +38,13 @@ fun QualityStatsCard(
     modifier: Modifier = Modifier,
     compact: Boolean = false,
 ) {
-    val tokens = hanaTokens
     val appearance = hanaAppearance
-    Column(
-        modifier
-            .clip(tokens.card)
-            .background(HanaColors.bgPanel)
-            .padding(if (compact) 10.dp else 14.dp),
-    ) {
+    val colors = hanaColors
+    FrostedSurface(modifier) {
+        Column(Modifier.padding(if (compact) 10.dp else 14.dp)) {
         Text(
             Copy.moveQuality,
-            color = HanaColors.text,
+            color = colors.text,
             fontSize = 14.sp,
             fontWeight = FontWeight.SemiBold,
         )
@@ -76,12 +72,12 @@ fun QualityStatsCard(
                     Modifier
                         .size(8.dp)
                         .clip(CircleShape)
-                        .background(qualityDotColor(band)),
+                        .background(qualityDotColor(band, colors.accentLilac)),
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
                     bandLabel(band),
-                    color = HanaColors.text,
+                    color = colors.text,
                     fontSize = 12.sp,
                     modifier = Modifier.weight(1f),
                     maxLines = 1,
@@ -90,6 +86,7 @@ fun QualityStatsCard(
                 Spacer(Modifier.width(8.dp))
                 CountCell(white)
             }
+        }
         }
     }
 }
@@ -108,7 +105,7 @@ private fun SideHead(color: Color, label: String) {
                 .background(color),
         )
         Spacer(Modifier.width(4.dp))
-        Text(label, color = HanaColors.textDim, fontSize = 11.sp)
+        Text(label, color = hanaColors.textDim, fontSize = 11.sp)
     }
 }
 
@@ -116,7 +113,7 @@ private fun SideHead(color: Color, label: String) {
 private fun CountCell(value: Int) {
     Text(
         value.toString(),
-        color = if (value == 0) HanaColors.textDim else HanaColors.text,
+        color = if (value == 0) hanaColors.textDim else hanaColors.text,
         fontSize = 12.sp,
         fontWeight = FontWeight.SemiBold,
         textAlign = TextAlign.End,

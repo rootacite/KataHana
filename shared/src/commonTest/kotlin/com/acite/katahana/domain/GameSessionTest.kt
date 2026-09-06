@@ -129,4 +129,31 @@ class GameSessionTest {
         assertFalse(snap.aiToPlay)
         assertTrue(snap.humanControls)
     }
+
+    @Test
+    fun exitReviewReturnsToLastLeaf() {
+        val session = GameSession(GameConfig(boardSize = 9))
+        session.play(Point(3, 3))
+        session.play(Point(5, 5))
+        val leaf = session.tree.current.id
+        session.undo()
+        assertTrue(session.reviewing)
+        assertTrue(session.exitReview())
+        assertEquals(leaf, session.tree.current.id)
+        assertFalse(session.reviewing)
+    }
+
+    @Test
+    fun sessionSeedsResumeLeafWhenLoadedMidReview() {
+        val tree = GameTree(9)
+        tree.play(Point(4, 4))
+        tree.play(Point(3, 3))
+        val leaf = tree.current.id
+        tree.applyChildPath(listOf(0))
+        assertTrue(tree.reviewing)
+        val session = GameSession(GameConfig(boardSize = 9), tree)
+        assertEquals(leaf, session.tree.lastLeaf().id)
+        assertTrue(session.exitReview())
+        assertEquals(leaf, session.tree.current.id)
+    }
 }

@@ -55,6 +55,7 @@ object Copy {
     const val redo = "Redo"
     const val confirm = "Confirm"
     const val endForecast = "End preview"
+    const val exitReview = "Resume"
     const val engineOffline = "Offline"
     const val engineOnline = "Online"
     const val engineConnecting = "Connecting"
@@ -99,21 +100,30 @@ object Copy {
     const val reviewVisits = "Review visits"
     const val testConnection = "Test connection"
     const val benchmark = "Benchmark"
-    const val benchmarkHint = "1-visit, 80, 400, and 2000-visit 19×19. About 20–90 seconds."
+    const val benchmarkHint =
+        "Ping, overlay 1-visit, then 80 / 400 / 2000-visit 19×19. Splits network delay from GPU/CPU. About 15–70 seconds."
     const val benchmarkOfflineHint = "Connect the engine to run a benchmark."
     const val runBenchmark = "Run benchmark"
     const val benchmarkRunning = "Running…"
     const val benchmarkWarmup = "Warming up…"
-    fun benchmarkLatency(done: Int, total: Int): String = "Latency $done / $total"
+    fun benchmarkPing(done: Int, total: Int): String = "Ping $done / $total"
+    fun benchmarkLatency(done: Int, total: Int): String = "Overlay $done / $total"
     fun benchmarkSearchVisits(visits: Int): String = "$visits visits…"
     const val benchmarkHuman = "Human SL…"
-    const val benchmarkLatencyTitle = "Latency  ·  1-visit 19×19"
+    const val benchmarkNetworkTitle = "Network"
+    const val benchmarkHardwareTitle = "Server hardware"
+    const val benchmarkLatencyTitle = "Overlay  ·  1-visit 19×19"
     const val benchmarkSearchTitle = "Search  ·  19×19"
     const val benchmarkHumanTitle = "Human SL"
     const val median = "median"
     const val p95 = "p95"
-    const val queriesPerSec = "queries/s"
     const val visitsPerSecLabel = "visits/s"
+    const val youAreHere = "You are here"
+    const val hardwareTickCpu = "CPU"
+    const val hardwareTickEntry = "entry GPU"
+    const val hardwareTickMid = "mid"
+    const val hardwareTickHigh = "high-end"
+    const val pingFallback = "Ping unavailable — RTT estimated from search times."
     fun playVisitsEta(visits: Int, duration: String): String =
         "Your play visits ($visits) ≈ $duration"
     fun searchRung(visits: Int): String = "$visits visits"
@@ -121,23 +131,25 @@ object Copy {
         "$duration  ·  $vps $visitsPerSecLabel"
     const val humanPolicyPresent = "policy present"
     const val humanNetMissing = "Human net not loaded"
-    const val benchmarkExcellent = "Excellent — KataGo feels instant on this server."
-    const val benchmarkExcellentGear =
-        "Local high-end GPU: RX 7900 / 9070 XT, RTX 4070 Super or better."
-    const val benchmarkSmooth = "Smooth — this server can run KataGo comfortably."
-    const val benchmarkSmoothGear =
-        "Local mid GPU: RTX 3060 / 4060, RX 6600, or Apple M2 / M3."
-    const val benchmarkPlayable = "Playable — live analysis may feel a beat behind."
-    const val benchmarkPlayableGear =
-        "Entry GPU, Intel Arc, or a strong desktop CPU on a local link."
-    const val benchmarkTight =
-        "Tight — overlays will lag; drop Play visits or use a stronger GPU."
-    const val benchmarkTightGear =
-        "CPU-only laptop, or the engine is across a slow network."
-    const val benchmarkStrained =
-        "Strained — this server is too slow for comfortable KataGo play."
-    const val benchmarkStrainedGear =
-        "Below a typical laptop CPU running KataGo, or a high-latency remote."
+    const val networkLocal = "Local — round-trips will not show up in play."
+    const val networkLan = "LAN — a short hop; overlays stay snappy."
+    const val networkNearby = "Nearby — fine for play, a beat on every 1-visit overlay."
+    const val networkDistant = "Distant — every overlay waits on the wire, even with a fast GPU."
+    const val networkHighDelay = "High delay — live analysis will stutter regardless of hardware."
+    const val hardwareWeakCpu = "Below a typical laptop CPU running KataGo."
+    const val hardwareLaptopCpu = "Laptop CPU class."
+    const val hardwareDesktopCpu = "Desktop CPU or entry iGPU."
+    const val hardwareEntryGpu = "Entry discrete GPU or Apple M-series."
+    const val hardwareMidGpu = "Mid GPU: RTX 3060 / 4060, RX 6600."
+    const val hardwareHighEnd = "High-end: 4070 Super / 7900 / 9070 XT class."
+    fun playFeelGpuPlenty(rtt: String): String =
+        "GPU is plenty, but every overlay waits on ~$rtt of network."
+    fun playFeelSearchLimits(visits: Int, eta: String): String =
+        "Network is local; search is the limit — $visits visits ≈ $eta."
+    fun playFeelBothFine(rtt: String, visits: Int, eta: String): String =
+        "Overlays update in ~$rtt; $visits visits ≈ $eta."
+    fun playFeelBothTight(rtt: String, visits: Int, eta: String): String =
+        "Network adds ~$rtt and $visits visits still take ≈ $eta."
     const val notWired = "Not wired in this phase."
     const val visitsLabel = "visits"
     fun forecastDropValue(seconds: Float): String =

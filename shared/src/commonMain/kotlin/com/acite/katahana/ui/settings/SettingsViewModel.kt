@@ -128,6 +128,7 @@ class SettingsViewModel(
 
     private fun benchmarkStepLabel(step: BenchmarkStep): String = when (step) {
         BenchmarkStep.Warmup -> Copy.benchmarkWarmup
+        is BenchmarkStep.Ping -> Copy.benchmarkPing(step.done, step.total)
         is BenchmarkStep.Latency -> Copy.benchmarkLatency(step.done, step.total)
         is BenchmarkStep.Search -> Copy.benchmarkSearchVisits(step.visits)
         BenchmarkStep.Human -> Copy.benchmarkHuman

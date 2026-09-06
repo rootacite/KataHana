@@ -1,6 +1,5 @@
 package com.acite.katahana.ui.home
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -18,11 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -33,13 +28,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
@@ -54,13 +46,15 @@ import com.acite.katahana.sgf.parseSgf
 import com.acite.katahana.ui.Copy
 import com.acite.katahana.ui.LocalAppExit
 import com.acite.katahana.ui.components.BrandMark
+import com.acite.katahana.ui.components.HanaBackdrop
+import com.acite.katahana.ui.components.HanaScrimModal
 import com.acite.katahana.ui.components.HomeNavTile
 import com.acite.katahana.ui.components.PorcelainCard
 import com.acite.katahana.ui.components.QuietTextButton
 import com.acite.katahana.ui.engine.EngineSettingsScreen
 import com.acite.katahana.ui.session.SessionScreen
 import com.acite.katahana.ui.settings.SettingsScreen
-import com.acite.katahana.ui.theme.HanaColors
+import com.acite.katahana.ui.theme.hanaColors
 import com.acite.katahana.ui.theme.hanaTokens
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeSource
@@ -75,12 +69,10 @@ class HomeScreen : Screen {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun HomeRoute() {
     val navigator = LocalNavigator.currentOrThrow
     var newMode by remember { mutableStateOf<PlayMode?>(null) }
-    val tokens = hanaTokens
     val sgfFiles = LocalSgfFiles.current
     val appExit = LocalAppExit.current
     val scope = rememberCoroutineScope()
@@ -96,72 +88,68 @@ private fun HomeRoute() {
         }
     }
 
-    BoxWithConstraints(
-        Modifier
-            .fillMaxSize()
-            .background(HanaColors.bgApp),
-    ) {
+    HanaBackdrop { hazeState ->
+    val overlayHaze = rememberHazeState()
+    BoxWithConstraints(Modifier.fillMaxSize()) {
         val landscape = maxWidth > maxHeight
         val wide = maxWidth >= 840.dp
-        val hazeState = rememberHazeState()
         Box(
             Modifier
                 .fillMaxSize()
-                .hazeSource(hazeState),
+                .hazeSource(overlayHaze),
         ) {
-            GlowOrbs()
-        }
-        if (wide) {
-            Row(
-                Modifier
-                    .fillMaxSize()
-                    .padding(28.dp),
-                horizontalArrangement = Arrangement.spacedBy(22.dp),
-            ) {
-                HomeRail(
-                    hazeState = hazeState,
-                    modifier = Modifier
-                        .width(260.dp)
-                        .fillMaxHeight()
-                        .verticalScroll(rememberScrollState()),
-                    onHuman = { newMode = PlayMode.HumanVsHuman },
-                    onKatago = { newMode = PlayMode.HumanVsAi },
-                    onLoad = openSgf,
-                    onEngine = { navigator.push(EngineSettingsScreen()) },
-                    onSettings = { navigator.push(SettingsScreen()) },
-                    onQuit = { appExit.exit() },
-                )
+            if (wide) {
+                Row(
+                    Modifier
+                        .fillMaxSize()
+                        .padding(28.dp),
+                    horizontalArrangement = Arrangement.spacedBy(22.dp),
+                ) {
+                    HomeRail(
+                        hazeState = hazeState,
+                        modifier = Modifier
+                            .width(260.dp)
+                            .fillMaxHeight()
+                            .verticalScroll(rememberScrollState()),
+                        onHuman = { newMode = PlayMode.HumanVsHuman },
+                        onKatago = { newMode = PlayMode.HumanVsAi },
+                        onLoad = openSgf,
+                        onEngine = { navigator.push(EngineSettingsScreen()) },
+                        onSettings = { navigator.push(SettingsScreen()) },
+                        onQuit = { appExit.exit() },
+                    )
+                    Column(
+                        Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
+                        RecentSection(hazeState, recents, homeVm, navigator)
+                        ChangelogSection(hazeState)
+                    }
+                }
+            } else {
                 Column(
                     Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
+                    PorcelainCard(hazeState) { BrandMark(compact = true) }
+                    HomeActionGrid(
+                        hazeState = hazeState,
+                        onHuman = { newMode = PlayMode.HumanVsHuman },
+                        onKatago = { newMode = PlayMode.HumanVsAi },
+                        onLoad = openSgf,
+                        onEngine = { navigator.push(EngineSettingsScreen()) },
+                        onSettings = { navigator.push(SettingsScreen()) },
+                        onQuit = { appExit.exit() },
+                    )
                     RecentSection(hazeState, recents, homeVm, navigator)
                     ChangelogSection(hazeState)
                 }
-            }
-        } else {
-            Column(
-                Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
-            ) {
-                PorcelainCard(hazeState) { BrandMark(compact = true) }
-                HomeActionGrid(
-                    hazeState = hazeState,
-                    onHuman = { newMode = PlayMode.HumanVsHuman },
-                    onKatago = { newMode = PlayMode.HumanVsAi },
-                    onLoad = openSgf,
-                    onEngine = { navigator.push(EngineSettingsScreen()) },
-                    onSettings = { navigator.push(SettingsScreen()) },
-                    onQuit = { appExit.exit() },
-                )
-                RecentSection(hazeState, recents, homeVm, navigator)
-                ChangelogSection(hazeState)
             }
         }
 
@@ -171,74 +159,16 @@ private fun HomeRoute() {
                 newMode = null
                 navigator.push(SessionScreen(config))
             }
-            if (!landscape) {
-                ModalBottomSheet(
-                    onDismissRequest = { newMode = null },
-                    sheetState = rememberBottomSheetState(
-                        initialValue = SheetValue.Hidden,
-                        enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
-                    ),
-                    containerColor = HanaColors.bgPanel,
-                    shape = tokens.sheet,
-                ) {
-                    NewGameSheet(onStart = start, initial = lastGame, lockedMode = newMode)
-                }
-            } else {
-                Dialog(onDismissRequest = { newMode = null }) {
-                    Box(
-                        Modifier
-                            .width(420.dp)
-                            .clip(tokens.card)
-                            .background(HanaColors.bgPanel)
-                            .padding(8.dp),
-                    ) {
-                        NewGameSheet(onStart = start, initial = lastGame, lockedMode = newMode)
-                    }
-                }
+            HanaScrimModal(
+                onDismiss = { newMode = null },
+                hazeState = overlayHaze,
+                alignment = if (landscape) Alignment.Center else Alignment.BottomCenter,
+                modifier = if (landscape) Modifier.width(420.dp) else Modifier.fillMaxWidth(),
+            ) {
+                NewGameSheet(onStart = start, initial = lastGame, lockedMode = newMode)
             }
         }
     }
-}
-
-@Composable
-private fun GlowOrbs() {
-    Canvas(Modifier.fillMaxSize()) {
-        fun orb(center: Offset, radius: Float, color: Color, core: Float, mid: Float) {
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(
-                        color.copy(alpha = core),
-                        color.copy(alpha = mid),
-                        Color.Transparent,
-                    ),
-                    center = center,
-                    radius = radius,
-                ),
-                radius = radius,
-                center = center,
-            )
-        }
-        orb(
-            center = Offset(80.dp.toPx(), 100.dp.toPx()),
-            radius = 252.dp.toPx(),
-            color = HanaColors.accentPink,
-            core = 0.55f,
-            mid = 0.16f,
-        )
-        orb(
-            center = Offset(size.width - 70.dp.toPx(), 170.dp.toPx()),
-            radius = 240.dp.toPx(),
-            color = HanaColors.accentBlue,
-            core = 0.48f,
-            mid = 0.14f,
-        )
-        orb(
-            center = Offset(110.dp.toPx(), size.height - 90.dp.toPx()),
-            radius = 224.dp.toPx(),
-            color = HanaColors.accentLilac,
-            core = 0.42f,
-            mid = 0.12f,
-        )
     }
 }
 
@@ -256,14 +186,14 @@ private fun HomeRail(
     Column(modifier, verticalArrangement = Arrangement.spacedBy(14.dp)) {
         PorcelainCard(hazeState) { BrandMark() }
         PorcelainCard(hazeState, title = Copy.play) {
-            HomeNavTile(Copy.hvh, onHuman, modifier = Modifier.fillMaxWidth(), accent = HanaColors.accentPink, emphasized = true)
-            HomeNavTile(Copy.humanVsKatago, onKatago, modifier = Modifier.fillMaxWidth(), accent = HanaColors.accentBlue, emphasized = true)
-            HomeNavTile(Copy.loadGame, onLoad, modifier = Modifier.fillMaxWidth(), accent = HanaColors.accentLilac)
+            HomeNavTile(Copy.hvh, onHuman, modifier = Modifier.fillMaxWidth(), accent = hanaColors.accentPink, emphasized = true)
+            HomeNavTile(Copy.humanVsKatago, onKatago, modifier = Modifier.fillMaxWidth(), accent = hanaColors.accentBlue, emphasized = true)
+            HomeNavTile(Copy.loadGame, onLoad, modifier = Modifier.fillMaxWidth(), accent = hanaColors.accentLilac)
         }
         PorcelainCard(hazeState, title = Copy.app) {
-            HomeNavTile(Copy.engine, onEngine, modifier = Modifier.fillMaxWidth(), accent = HanaColors.accentBlue)
-            HomeNavTile(Copy.settings, onSettings, modifier = Modifier.fillMaxWidth(), accent = HanaColors.accentLilac)
-            HomeNavTile(Copy.quit, onQuit, modifier = Modifier.fillMaxWidth(), accent = HanaColors.textDim)
+            HomeNavTile(Copy.engine, onEngine, modifier = Modifier.fillMaxWidth(), accent = hanaColors.accentBlue)
+            HomeNavTile(Copy.settings, onSettings, modifier = Modifier.fillMaxWidth(), accent = hanaColors.accentLilac)
+            HomeNavTile(Copy.quit, onQuit, modifier = Modifier.fillMaxWidth(), accent = hanaColors.textDim)
         }
     }
 }
@@ -281,17 +211,17 @@ private fun HomeActionGrid(
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         PorcelainCard(hazeState, title = Copy.play) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                HomeNavTile(Copy.hvh, onHuman, Modifier.weight(1f), HanaColors.accentPink, emphasized = true)
-                HomeNavTile(Copy.humanVsKatago, onKatago, Modifier.weight(1f), HanaColors.accentBlue, emphasized = true)
+                HomeNavTile(Copy.hvh, onHuman, Modifier.weight(1f), hanaColors.accentPink, emphasized = true)
+                HomeNavTile(Copy.humanVsKatago, onKatago, Modifier.weight(1f), hanaColors.accentBlue, emphasized = true)
             }
-            HomeNavTile(Copy.loadGame, onLoad, Modifier.fillMaxWidth(), HanaColors.accentLilac)
+            HomeNavTile(Copy.loadGame, onLoad, Modifier.fillMaxWidth(), hanaColors.accentLilac)
         }
         PorcelainCard(hazeState, title = Copy.app) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                HomeNavTile(Copy.engine, onEngine, Modifier.weight(1f), HanaColors.accentBlue)
-                HomeNavTile(Copy.settings, onSettings, Modifier.weight(1f), HanaColors.accentLilac)
+                HomeNavTile(Copy.engine, onEngine, Modifier.weight(1f), hanaColors.accentBlue)
+                HomeNavTile(Copy.settings, onSettings, Modifier.weight(1f), hanaColors.accentLilac)
             }
-            HomeNavTile(Copy.quit, onQuit, Modifier.fillMaxWidth(), HanaColors.textDim)
+            HomeNavTile(Copy.quit, onQuit, Modifier.fillMaxWidth(), hanaColors.textDim)
         }
     }
 }
@@ -305,7 +235,7 @@ private fun RecentSection(
 ) {
     PorcelainCard(hazeState, title = Copy.recent) {
         if (recents.isEmpty()) {
-            Text(Copy.noRecent, color = HanaColors.textDim, fontSize = 14.sp)
+            Text(Copy.noRecent, color = hanaColors.textDim, fontSize = 14.sp)
         } else {
             recents.forEach { game ->
                 RecentGameCard(
@@ -334,7 +264,7 @@ private fun ChangelogSection(hazeState: dev.chrisbanes.haze.HazeState) {
     val entries = AppInfo.changelog.take(16)
     PorcelainCard(hazeState, title = Copy.whatsNew) {
         if (entries.isEmpty()) {
-            Text(Copy.noChangelog, color = HanaColors.textDim, fontSize = 14.sp)
+            Text(Copy.noChangelog, color = hanaColors.textDim, fontSize = 14.sp)
         } else {
             entries.forEach { entry ->
                 ChangelogRow(entry)
@@ -351,25 +281,25 @@ private fun ChangelogRow(entry: ChangelogEntry) {
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             entry.gitTags.forEach { tag ->
-                ChangelogChip(tag, HanaColors.accentPink)
+                ChangelogChip(tag, hanaColors.accentPink)
             }
             entry.kind?.let { kind ->
                 val accent = when (kind.lowercase()) {
-                    "feat" -> HanaColors.accentPink
-                    "fix" -> HanaColors.accentBlue
-                    "doc" -> HanaColors.qualityMint
-                    else -> HanaColors.accentLilac
+                    "feat" -> hanaColors.accentPink
+                    "fix" -> hanaColors.accentBlue
+                    "doc" -> hanaColors.qualityMint
+                    else -> hanaColors.accentLilac
                 }
                 ChangelogChip(kind, accent)
             }
             Text(
                 entry.date,
-                color = HanaColors.textDim,
+                color = hanaColors.textDim,
                 fontSize = 12.sp,
                 modifier = Modifier.align(Alignment.CenterVertically),
             )
         }
-        Text(entry.title, color = HanaColors.text, fontSize = 14.sp)
+        Text(entry.title, color = hanaColors.text, fontSize = 14.sp)
     }
 }
 
@@ -403,12 +333,12 @@ private fun RecentGameCard(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
-            Text(game.title, color = HanaColors.text, fontSize = 15.sp)
+            Text(game.title, color = hanaColors.text, fontSize = 15.sp)
             Spacer(Modifier.height(4.dp))
-            Text(game.modeLine(), color = HanaColors.textDim, fontSize = 12.sp)
+            Text(game.modeLine(), color = hanaColors.textDim, fontSize = 12.sp)
             Text(
                 formatSavedAt(game.savedAt, now),
-                color = HanaColors.accentLilac,
+                color = hanaColors.accentLilac,
                 fontSize = 12.sp,
             )
         }

@@ -23,8 +23,8 @@ import com.acite.katahana.ui.navigation.HanaBackHandler
 import com.acite.katahana.ui.navigation.ProvideHanaScreenLifecycle
 import com.acite.katahana.ui.settings.SettingsViewModel
 import com.acite.katahana.ui.theme.Appearance
-import com.acite.katahana.ui.theme.HanaColors
 import com.acite.katahana.ui.theme.KataHanaTheme
+import com.acite.katahana.ui.theme.hanaColors
 import dev.zacsweers.metrox.viewmodel.LocalMetroViewModelFactory
 import dev.zacsweers.metrox.viewmodel.MetroViewModelFactory
 import dev.zacsweers.metrox.viewmodel.metroViewModel
@@ -37,10 +37,11 @@ fun App(metroVmf: MetroViewModelFactory) {
                 val settings = metroViewModel<SettingsViewModel>()
                 val appearanceId by settings.appearanceId.collectAsState()
                 KataHanaTheme(appearance = Appearance.byId(appearanceId)) {
+                    val colors = hanaColors
                     Box(
                         Modifier
                             .fillMaxSize()
-                            .background(HanaColors.bgApp)
+                            .background(colors.bgApp)
                             .windowInsetsPadding(WindowInsets.displayCutout),
                     ) {
                         Navigator(HomeScreen(), onBackPressed = null) { navigator ->

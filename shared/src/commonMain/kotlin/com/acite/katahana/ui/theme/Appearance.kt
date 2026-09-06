@@ -16,8 +16,10 @@ data class Appearance(
     val id: String,
     val label: String,
     val blurb: String,
+    val tagline: String,
     val first: StoneSwatch,
     val second: StoneSwatch,
+    val palette: HanaPalette,
 ) {
     fun swatch(color: StoneColor): StoneSwatch = when (color) {
         StoneColor.Black -> first
@@ -31,6 +33,8 @@ data class Appearance(
             id = DEFAULT_ID,
             label = "Sky & Sakura",
             blurb = "Clear-sky blue and cherry blossom",
+            tagline = "Local Go · pink night",
+            palette = HanaPalette.SkySakura,
             first = StoneSwatch(
                 fill = Color(0xFF3EA4F8),
                 rim = Color(0xFF1B7BD4),
@@ -49,6 +53,8 @@ data class Appearance(
             id = "ink_paper",
             label = "Ink & Paper",
             blurb = "Deep indigo and sakura paper",
+            tagline = "Local Go · ink wash",
+            palette = HanaPalette.InkPaper,
             first = StoneSwatch(
                 fill = Color(0xFF2B2148),
                 rim = Color(0xFF5B4D8A),
@@ -67,6 +73,8 @@ data class Appearance(
             id = "midnight_snow",
             label = "Midnight & Snow",
             blurb = "Night charcoal and warm snow",
+            tagline = "Local Go · midnight",
+            palette = HanaPalette.MidnightSnow,
             first = StoneSwatch(
                 fill = Color(0xFF1C1A28),
                 rim = Color(0xFF4A4660),
@@ -85,6 +93,8 @@ data class Appearance(
             id = "lilac_peach",
             label = "Lilac & Peach",
             blurb = "Soft lilac and ripe peach",
+            tagline = "Local Go · dusk",
+            palette = HanaPalette.LilacPeach,
             first = StoneSwatch(
                 fill = Color(0xFFB39BFF),
                 rim = Color(0xFF7B62D4),

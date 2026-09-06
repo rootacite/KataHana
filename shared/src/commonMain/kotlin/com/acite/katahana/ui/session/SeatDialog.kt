@@ -15,7 +15,8 @@ import com.acite.katahana.ui.components.CapsuleChoice
 import com.acite.katahana.ui.components.ChoiceRow
 import com.acite.katahana.ui.components.HanaDialogCard
 import com.acite.katahana.ui.components.RankLadder
-import com.acite.katahana.ui.theme.HanaColors
+import com.acite.katahana.ui.theme.hanaColors
+import dev.chrisbanes.haze.HazeState
 
 @Composable
 fun SeatDialog(
@@ -23,10 +24,11 @@ fun SeatDialog(
     seat: PlayerSeat,
     onChange: (PlayerSeat) -> Unit,
     onDismiss: () -> Unit,
+    hazeState: HazeState,
 ) {
     val title = if (color == StoneColor.Black) Copy.black else Copy.white
-    HanaDialogCard(onDismiss = onDismiss) {
-        Text(title, color = HanaColors.text, fontSize = 18.sp)
+    HanaDialogCard(onDismiss = onDismiss, hazeState = hazeState) {
+        Text(title, color = hanaColors.text, fontSize = 18.sp)
         Spacer(Modifier.height(14.dp))
         ChoiceRow {
             SeatKindChoice(Copy.playerHuman, SeatKind.Human, seat, onChange, Modifier.weight(1f))
@@ -47,7 +49,7 @@ fun SeatDialog(
         }
         if (seat.kind == SeatKind.Full) {
             Spacer(Modifier.height(4.dp))
-            Text(Copy.fullKatagoTease, color = HanaColors.accentPink, fontSize = 14.sp)
+            Text(Copy.fullKatagoTease, color = hanaColors.accentPink, fontSize = 14.sp)
         }
     }
 }

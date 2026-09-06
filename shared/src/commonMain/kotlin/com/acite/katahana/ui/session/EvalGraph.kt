@@ -9,13 +9,14 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -44,9 +45,10 @@ import com.acite.katahana.domain.advantage
 import com.acite.katahana.domain.advantageTint
 import com.acite.katahana.domain.yMaxFor
 import com.acite.katahana.ui.Copy
-import com.acite.katahana.ui.theme.HanaColors
+import com.acite.katahana.ui.components.FrostedSurface
 import com.acite.katahana.ui.theme.StoneSwatch
 import com.acite.katahana.ui.theme.hanaAppearance
+import com.acite.katahana.ui.theme.hanaColors
 import com.acite.katahana.ui.theme.hanaTokens
 import kotlin.math.abs
 import kotlin.math.ceil
@@ -100,6 +102,53 @@ fun SessionTreeColumn(
 }
 
 @Composable
+fun SessionTreeRow(
+    layout: TreeLayout,
+    reviewing: Boolean,
+    onGoToNode: (String) -> Unit,
+    samples: List<EvalSample>,
+    currentMoveNumber: Int,
+    graphMode: EvalGraphMode,
+    onGraphMode: (EvalGraphMode) -> Unit,
+    stats: QualityStats,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        GameTreeCard(
+            layout = layout,
+            reviewing = reviewing,
+            onGoToNode = onGoToNode,
+            compact = true,
+            modifier = Modifier
+                .weight(1.15f)
+                .fillMaxHeight(),
+        )
+        EvalGraphCard(
+            samples = samples,
+            currentMoveNumber = currentMoveNumber,
+            mode = graphMode,
+            onMode = onGraphMode,
+            onSeek = onGoToNode,
+            compact = true,
+            expandPlot = true,
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight(),
+        )
+        QualityStatsCard(
+            stats = stats,
+            compact = true,
+            modifier = Modifier
+                .weight(0.9f)
+                .fillMaxHeight(),
+        )
+    }
+}
+
+@Composable
 fun EvalGraphCard(
     samples: List<EvalSample>,
     currentMoveNumber: Int,
@@ -108,56 +157,62 @@ fun EvalGraphCard(
     onSeek: (String) -> Unit,
     modifier: Modifier = Modifier,
     compact: Boolean = false,
+    expandPlot: Boolean = false,
 ) {
     val tokens = hanaTokens
-    Column(
-        modifier
-            .clip(tokens.card)
-            .background(HanaColors.bgPanel)
-            .padding(if (compact) 10.dp else 14.dp),
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth(),
+    val colors = hanaColors
+    FrostedSurface(modifier) {
+        Column(
+            Modifier
+                .then(if (expandPlot) Modifier.fillMaxHeight() else Modifier)
+                .padding(if (compact) 10.dp else 14.dp),
         ) {
-            Text(
-                if (mode == EvalGraphMode.Score) Copy.score else Copy.winrate,
-                color = HanaColors.text,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.weight(1f),
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(
+                    if (mode == EvalGraphMode.Score) Copy.score else Copy.winrate,
+                    color = colors.text,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f),
+                )
+                ModePill(Copy.score, selected = mode == EvalGraphMode.Score) {
+                    onMode(EvalGraphMode.Score)
+                }
+                Spacer(Modifier.width(6.dp))
+                ModePill(Copy.winrate, selected = mode == EvalGraphMode.Winrate) {
+                    onMode(EvalGraphMode.Winrate)
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+            EvalPlot(
+                samples = samples,
+                currentMoveNumber = currentMoveNumber,
+                mode = mode,
+                onSeek = onSeek,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(if (expandPlot) Modifier.weight(1f) else Modifier.height(PlotHeight))
+                    .clip(tokens.panel)
+                    .background(colors.bgCard),
             )
-            ModePill(Copy.score, selected = mode == EvalGraphMode.Score) {
-                onMode(EvalGraphMode.Score)
-            }
-            Spacer(Modifier.width(6.dp))
-            ModePill(Copy.winrate, selected = mode == EvalGraphMode.Winrate) {
-                onMode(EvalGraphMode.Winrate)
-            }
         }
-        Spacer(Modifier.height(10.dp))
-        EvalPlot(
-            samples = samples,
-            currentMoveNumber = currentMoveNumber,
-            mode = mode,
-            onSeek = onSeek,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(PlotHeight)
-                .clip(tokens.panel)
-                .background(HanaColors.bgCard),
-        )
     }
 }
 
 @Composable
 private fun ModePill(label: String, selected: Boolean, onClick: () -> Unit) {
-    val bg = if (selected) HanaColors.accentPink else HanaColors.bgCard
-    val fg = if (selected) Color.White else HanaColors.textDim
+    val colors = hanaColors
+    val bg = if (selected) colors.accentPink.copy(alpha = 0.22f) else Color.White.copy(alpha = 0.05f)
+    val border = if (selected) colors.accentPink.copy(alpha = 0.40f) else Color.White.copy(alpha = 0.10f)
+    val fg = colors.text
     Box(
         Modifier
             .clip(hanaTokens.capsule)
             .background(bg)
+            .border(1.dp, border, hanaTokens.capsule)
             .clickable(onClick = onClick)
             .padding(horizontal = 10.dp, vertical = 4.dp),
         contentAlignment = Alignment.Center,
@@ -175,15 +230,12 @@ private fun EvalPlot(
     modifier: Modifier = Modifier,
 ) {
     val appearance = hanaAppearance
-    val blackInk = curveInk(appearance.first)
-    val whiteInk = curveInk(appearance.second)
+    val colors = hanaColors
+    val blackInk = curveInk(appearance.first, colors.bgCard)
+    val whiteInk = curveInk(appearance.second, colors.bgCard)
     val measurer = rememberTextMeasurer()
-    val labelStyle = remember {
-        TextStyle(color = HanaColors.textDim, fontSize = 10.sp, fontWeight = FontWeight.Medium)
-    }
-    val tagStyle = remember {
-        TextStyle(color = HanaColors.text, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
-    }
+    val labelStyle = TextStyle(color = colors.textDim, fontSize = 10.sp, fontWeight = FontWeight.Medium)
+    val tagStyle = TextStyle(color = colors.text, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
     val yMax = yMaxFor(samples, mode)
     val xMax = maxOf(
         samples.maxOfOrNull { it.moveNumber } ?: 0,
@@ -219,14 +271,14 @@ private fun EvalPlot(
         fun tint(adv: Double): Color = lerp(whiteInk, blackInk, advantageTint(adv, yMax))
 
         drawLine(
-            color = HanaColors.accentLilac.copy(alpha = 0.45f),
+            color = colors.accentLilac.copy(alpha = 0.45f),
             start = Offset(padL, zeroY),
             end = Offset(padL + plotW, zeroY),
             strokeWidth = 1.2.dp.toPx(),
         )
         val currentX = xOf(currentMoveNumber)
         drawLine(
-            color = HanaColors.accentPink.copy(alpha = 0.55f),
+            color = colors.accentPink.copy(alpha = 0.55f),
             start = Offset(currentX, padT),
             end = Offset(currentX, padT + plotH),
             strokeWidth = 1.1.dp.toPx(),
@@ -283,6 +335,8 @@ private fun EvalPlot(
                 plotRight = padL + plotW,
                 plotTop = padT,
                 plotBottom = padT + plotH,
+                card = colors.bgCard,
+                stroke = colors.stroke,
             )
         }
 
@@ -347,9 +401,9 @@ private fun DrawScope.drawAdvantageSegment(
     }
 }
 
-private fun curveInk(swatch: StoneSwatch): Color {
+private fun curveInk(swatch: StoneSwatch, card: Color): Color {
     val fill = swatch.fill
-    val contrast = abs(luminance(fill) - luminance(HanaColors.bgCard))
+    val contrast = abs(luminance(fill) - luminance(card))
     if (contrast >= 0.18f) return fill
     return if (swatch.light) swatch.rim else lerp(fill, swatch.hi, 0.65f)
 }
@@ -367,6 +421,8 @@ private fun DrawScope.drawLiveTag(
     plotRight: Float,
     plotTop: Float,
     plotBottom: Float,
+    card: Color,
+    stroke: Color,
 ) {
     val layout = measurer.measure(text, style)
     val padX = 6.dp.toPx()
@@ -388,9 +444,9 @@ private fun DrawScope.drawLiveTag(
     val origin = Offset(x, y)
     val box = Size(tagW, tagH)
     val radius = CornerRadius(6.dp.toPx())
-    drawRoundRect(HanaColors.bgCard.copy(alpha = 0.92f), origin, box, radius)
+    drawRoundRect(card.copy(alpha = 0.92f), origin, box, radius)
     drawRoundRect(
-        color = HanaColors.stroke.copy(alpha = 0.55f),
+        color = stroke.copy(alpha = 0.55f),
         topLeft = origin,
         size = box,
         cornerRadius = radius,

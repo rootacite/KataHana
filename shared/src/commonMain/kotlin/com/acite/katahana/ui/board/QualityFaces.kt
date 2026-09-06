@@ -13,7 +13,12 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import com.acite.katahana.ai.QualityBand
 import com.acite.katahana.ui.theme.HanaColors
 
-fun DrawScope.drawQualityFace(center: Offset, stoneRadius: Float, band: QualityBand) {
+fun DrawScope.drawQualityFace(
+    center: Offset,
+    stoneRadius: Float,
+    band: QualityBand,
+    shallow: Color = HanaColors.accentLilac,
+) {
     val r = stoneRadius * 0.96f
     val cap = StrokeCap.Round
     val join = StrokeJoin.Round
@@ -27,7 +32,7 @@ fun DrawScope.drawQualityFace(center: Offset, stoneRadius: Float, band: QualityB
         fill = false,
     )
     val ink = FacePen(
-        color = qualityDotColor(band),
+        color = qualityDotColor(band, shallow),
         stroke = Stroke(width = colorW, cap = cap, join = join),
         pad = 0f,
         fill = true,
@@ -166,7 +171,12 @@ private fun DrawScope.drawSweatSmile(c: Offset, r: Float, pen: FacePen) {
     drawPath(drop, pen.color, style = pen.stroke)
 }
 
-fun DrawScope.drawDeadFace(center: Offset, stoneRadius: Float, alpha: Float = 1f) {
+fun DrawScope.drawDeadFace(
+    center: Offset,
+    stoneRadius: Float,
+    alpha: Float = 1f,
+    accent: Color = HanaColors.accentLilac,
+) {
     val a = alpha.coerceIn(0f, 1f)
     if (a <= 0.01f) return
     val r = stoneRadius * 0.96f
@@ -181,7 +191,7 @@ fun DrawScope.drawDeadFace(center: Offset, stoneRadius: Float, alpha: Float = 1f
         fill = false,
     )
     val ink = FacePen(
-        color = HanaColors.accentLilac.copy(alpha = a),
+        color = accent.copy(alpha = a),
         stroke = Stroke(width = colorW, cap = cap, join = join),
         pad = 0f,
         fill = true,

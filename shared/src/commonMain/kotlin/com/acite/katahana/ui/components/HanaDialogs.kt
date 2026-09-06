@@ -1,10 +1,16 @@
 package com.acite.katahana.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -16,25 +22,28 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
 import com.acite.katahana.ui.Copy
-import com.acite.katahana.ui.theme.HanaColors
-import com.acite.katahana.ui.theme.hanaTokens
+import com.acite.katahana.ui.theme.hanaColors
+import dev.chrisbanes.haze.HazeState
 
 @Composable
 fun LeaveGameDialog(
     onSave: () -> Unit,
     onDiscard: () -> Unit,
     onCancel: () -> Unit,
+    hazeState: HazeState,
 ) {
-    HanaDialogCard(onDismiss = onCancel) {
-        Text(Copy.unsavedLeave, color = HanaColors.text, fontSize = 18.sp)
+    HanaDialogCard(onDismiss = onCancel, hazeState = hazeState) {
+        val colors = hanaColors
+        Text(Copy.unsavedLeave, color = colors.text, fontSize = 18.sp)
         Spacer(Modifier.height(8.dp))
-        Text(Copy.unsavedLeaveHint, color = HanaColors.textDim, fontSize = 13.sp)
+        Text(Copy.unsavedLeaveHint, color = colors.textDim, fontSize = 13.sp)
         Spacer(Modifier.height(16.dp))
         CapsuleButton(
             Copy.save,
@@ -57,11 +66,13 @@ fun SaveNameDialog(
     initial: String,
     onConfirm: (String) -> Unit,
     onCancel: () -> Unit,
+    hazeState: HazeState,
 ) {
     var name by remember { mutableStateOf(initial) }
     LaunchedEffect(initial) { name = initial }
-    HanaDialogCard(onDismiss = onCancel) {
-        Text(Copy.saveGame, color = HanaColors.text, fontSize = 18.sp)
+    HanaDialogCard(onDismiss = onCancel, hazeState = hazeState) {
+        val colors = hanaColors
+        Text(Copy.saveGame, color = colors.text, fontSize = 18.sp)
         Spacer(Modifier.height(12.dp))
         HanaField(Copy.gameName, name, onChange = { name = it })
         Spacer(Modifier.height(16.dp))
@@ -85,17 +96,54 @@ fun SaveNameDialog(
 }
 
 @Composable
+fun HanaScrimModal(
+    onDismiss: () -> Unit,
+    hazeState: HazeState,
+    modifier: Modifier = Modifier,
+    alignment: Alignment = Alignment.Center,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Box(Modifier.fillMaxSize()) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.32f))
+                .pointerInput(onDismiss) {
+                    detectTapGestures(onTap = { onDismiss() })
+                },
+        )
+        val sheet = alignment == Alignment.BottomCenter
+        FrostedSurface(
+            modifier = modifier
+                .align(alignment)
+                .padding(if (sheet) 0.dp else 20.dp)
+                .then(if (sheet) Modifier.fillMaxWidth() else Modifier)
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = {},
+                ),
+            hazeState = hazeState,
+            content = content,
+        )
+    }
+}
+
+@Composable
 internal fun HanaDialogCard(
     onDismiss: () -> Unit,
-    content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit,
+    hazeState: HazeState,
+    content: @Composable ColumnScope.() -> Unit,
 ) {
-    Dialog(onDismissRequest = onDismiss) {
+    HanaScrimModal(
+        onDismiss = onDismiss,
+        hazeState = hazeState,
+        modifier = Modifier
+            .widthIn(max = 380.dp)
+            .fillMaxWidth(),
+    ) {
         Column(
-            Modifier
-                .widthIn(max = 380.dp)
-                .clip(hanaTokens.card)
-                .background(HanaColors.bgPanel)
-                .padding(20.dp),
+            Modifier.padding(20.dp),
             content = content,
         )
     }

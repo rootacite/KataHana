@@ -53,4 +53,43 @@ class TreeLayoutTest {
         assertTrue(future.onActiveLine)
         assertEquals(current.row, future.row)
     }
+
+    @Test
+    fun lastLeafPathStaysActiveDuringReview() {
+        val tree = GameTree(9)
+        tree.play(Point(3, 3))
+        tree.play(Point(5, 5))
+        val leafId = tree.current.id
+        tree.undo()
+        val layout = tree.layout()
+        val current = layout.nodes.first { it.isCurrent }
+        val leaf = layout.nodes.first { it.id == leafId }
+        val root = layout.nodes.first { it.parentId == null }
+        assertTrue(root.onActiveLine)
+        assertTrue(current.onActiveLine)
+        assertTrue(leaf.onActiveLine)
+        assertTrue(leaf.isFuture)
+        assertFalse(current.isFuture)
+    }
+
+    @Test
+    fun lastLeafLineStaysActiveWhenViewingAnotherVariation() {
+        val tree = GameTree(9)
+        tree.play(Point(3, 3))
+        tree.play(Point(5, 5))
+        val mainLeaf = tree.current.id
+        tree.undo()
+        tree.undo()
+        tree.play(Point(4, 4))
+        val sideLeaf = tree.current.id
+        tree.goTo(tree.root.children[0].id)
+        val layout = tree.layout()
+        val main = layout.nodes.first { it.id == mainLeaf }
+        val side = layout.nodes.first { it.id == sideLeaf }
+        val current = layout.nodes.first { it.isCurrent }
+        assertTrue(side.onActiveLine)
+        assertFalse(main.onActiveLine)
+        assertTrue(current.isCurrent)
+        assertFalse(current.onActiveLine)
+    }
 }

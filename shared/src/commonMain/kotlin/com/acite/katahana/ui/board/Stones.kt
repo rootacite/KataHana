@@ -116,16 +116,21 @@ fun DrawScope.drawForecastCaptureMark(center: Offset, radius: Float, lightStone:
     )
 }
 
-fun DrawScope.drawForecastLoading(center: Offset, radius: Float, pulse: Float) {
+fun DrawScope.drawForecastLoading(
+    center: Offset,
+    radius: Float,
+    pulse: Float,
+    accent: Color = HanaColors.accentPink,
+) {
     val t = pulse.coerceIn(0f, 1f)
     val r = radius * (0.78f + 0.10f * t)
     drawCircle(
-        color = HanaColors.accentPink.copy(alpha = 0.18f + 0.16f * t),
+        color = accent.copy(alpha = 0.18f + 0.16f * t),
         radius = r,
         center = center,
     )
     drawCircle(
-        color = HanaColors.accentPink.copy(alpha = 0.85f),
+        color = accent.copy(alpha = 0.85f),
         radius = r,
         center = center,
         style = Stroke(width = (radius * 0.10f).coerceAtLeast(1.8f)),

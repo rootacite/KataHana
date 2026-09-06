@@ -34,12 +34,10 @@ fun GameTree.nodeById(id: String): Node? {
 fun GameTree.layout(): TreeLayout {
     val pathToCurrent = nodesFromRoot().map { it.id }.toHashSet()
     val active = LinkedHashSet<String>()
-    nodesFromRoot().forEach { active.add(it.id) }
-    var walk = current
-    while (walk.children.isNotEmpty()) {
-        val i = walk.preferredChild.coerceIn(0, walk.children.lastIndex)
-        walk = walk.children[i]
+    var walk: Node? = lastLeaf()
+    while (walk != null) {
         active.add(walk.id)
+        walk = walk.parent
     }
 
     val out = ArrayList<TreeLayoutNode>()

@@ -50,9 +50,9 @@ import com.acite.katahana.engine.Candidate
 import com.acite.katahana.engine.formatScoreLoss
 import com.acite.katahana.engine.lerpOwnership
 import com.acite.katahana.settings.OwnershipStyle
-import com.acite.katahana.ui.theme.HanaColors
 import com.acite.katahana.ui.theme.HanaMotion
 import com.acite.katahana.ui.theme.hanaAppearance
+import com.acite.katahana.ui.theme.hanaColors
 
 @Composable
 fun BoardCanvas(
@@ -195,6 +195,7 @@ fun BoardCanvas(
     val measurer = rememberTextMeasurer()
     val boardSize = snapshot.size
     val appearance = hanaAppearance
+    val colors = hanaColors
     val boardInWindow = remember { mutableStateOf(Offset.Zero) }
     val ownershipMorph = remember { OwnershipMorph() }
     val morph = remember { Animatable(1f) }
@@ -368,12 +369,12 @@ fun BoardCanvas(
     ) {
         val layout = BoardLayout(this.size.width, this.size.height, boardSize, showCoords)
         drawRoundRect(
-            color = HanaColors.boardBg,
+            color = colors.boardBg,
             topLeft = Offset(layout.originX, layout.originY),
             size = Size(layout.side, layout.side),
             cornerRadius = CornerRadius(22.dp.toPx(), 22.dp.toPx()),
         )
-        val gridColor = HanaColors.grid.copy(alpha = 0.45f)
+        val gridColor = colors.grid.copy(alpha = 0.45f)
         val stroke = (1.2.dp.toPx()).coerceAtLeast(1f)
         for (i in 0 until boardSize) {
             val x = layout.xOf(i)
@@ -411,16 +412,18 @@ fun BoardCanvas(
                         breath = starBreath.value,
                         twinkle = starTwinkle.value,
                     ),
+                    ownBlue = colors.accentBlue,
+                    ownPink = colors.accentPink,
                 )
             }
         }
         val starR = (layout.gap * 0.09f).coerceAtLeast(2.5f)
         for (h in hoshiPoints(boardSize)) {
-            drawHoshi(layout.center(h), starR)
+            drawHoshi(layout.center(h), starR, colors.star)
         }
         if (showCoords) {
             val style = TextStyle(
-                color = HanaColors.textDim,
+                color = colors.textDim,
                 fontSize = (layout.gap * 0.42f).coerceIn(13f, 18f).sp,
             )
             val letters = gtpLetters(boardSize)
@@ -480,12 +483,12 @@ fun BoardCanvas(
             if (mark.point in captured || mark.point in virtualPoints) continue
             val onBoard = snapshot.stoneAt(mark.point.x, mark.point.y)
             if (onBoard != mark.color) continue
-            drawQualityFace(layout.center(mark.point), stoneR, mark.band)
+            drawQualityFace(layout.center(mark.point), stoneR, mark.band, colors.accentLilac)
         }
         for (point in deadPoints) {
             if (point in captured || point in virtualPoints) continue
             if (snapshot.stoneAt(point.x, point.y) == null) continue
-            drawDeadFace(layout.center(point), stoneR)
+            drawDeadFace(layout.center(point), stoneR, accent = colors.accentLilac)
         }
         val flightT = captureFlight.value
         if (departing.isNotEmpty() && flightT < 0.999f) {
@@ -503,7 +506,7 @@ fun BoardCanvas(
                         stoneR,
                         alpha = 0.40f * fade,
                     )
-                    drawDeadFace(c, stoneR, alpha = fade)
+                    drawDeadFace(c, stoneR, alpha = fade, accent = colors.accentLilac)
                 }
             }
         }
@@ -544,7 +547,14 @@ fun BoardCanvas(
             drawStone(snapshot.toPlay, appearance, layout.center(preview), stoneR, alpha = 0.42f)
         }
         if (forecastLoading) {
-            forecast?.let { drawForecastLoading(layout.center(it.origin), stoneR, lastBreath.value) }
+            forecast?.let {
+                drawForecastLoading(
+                    layout.center(it.origin),
+                    stoneR,
+                    lastBreath.value,
+                    accent = colors.accentPink,
+                )
+            }
         }
         val plyStyleBase = (stoneR * 0.72f).coerceIn(11f, 18f).sp
         val originLoss = forecast?.originLoss
