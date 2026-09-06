@@ -45,7 +45,7 @@ All paths relative to `shared/src/commonMain/kotlin/com/acite/katahana/` unless 
 | `domain/` | **Pure game logic, zero UI/reactive imports.** Board & rules (`Position`, `Rules`, `Move`, `Point`, `StoneColor`), the game tree (`GameTree`, `Node`, `TreeLayout`), the session facade (`GameSession`, `SessionSnapshot`), config/seats (`GameConfig`, `PlayerSeat`), analysis value types (`EvalSeries`, `Forecast`). |
 | `ai/` | Pure move choosers over engine outputs: `FullStrengthBot` (KataGo best), `RankBot` (KaTrain-calibrated rank AI), `HumanBot` (human-style sampling of the SL policy), `MoveQuality` (points-lost bands). |
 | `engine/` | The engine client: `AnalysisClient` (one WebSocket, query orchestration), `WsClient` + `EngineHttpClient` (expect/actual), `QueryBuilder` (query JSON per use), `AnalysisDto` (JSON schema), `Perspective` (winrate/score view + candidate + dead-stone logic), `EngineBenchmark`. |
-| `settings/` | `SettingsRepository`: single DataStore-preferences file, typed flows for every toggle/threshold/profile; `OwnershipStyle`; `AnalysisLayoutMode` (Auto / Compact tabs / Expanded three cards). |
+| `settings/` | `SettingsRepository`: single DataStore-preferences file, typed flows for every toggle/threshold/profile; `OwnershipStyle`; `AnalysisLayoutMode` (Auto / Compact tabs / Expanded three cards); coordinate edge/grid padding in dp. |
 | `recents/` | Recent-game index + persistence (`RecentGame`, `RecentGamesRepository`, `RecentGamesIndex`, `TextFiles` expect/actual). |
 | `sgf/` | Hand-rolled SGF v4 reader/writer (`SgfIo`) + platform file dialogs (`SgfFiles`). |
 | `changelog/` | Parsing of `git log` output for the in-app "What's new" list. |

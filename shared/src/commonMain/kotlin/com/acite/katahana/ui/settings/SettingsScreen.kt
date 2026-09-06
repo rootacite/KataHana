@@ -41,6 +41,7 @@ import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import com.acite.katahana.settings.AnalysisLayoutMode
+import com.acite.katahana.settings.COORD_PAD_DP_MAX
 import com.acite.katahana.settings.FORECAST_DROP_MS_MAX
 import com.acite.katahana.settings.OwnershipStyle
 import com.acite.katahana.ui.Copy
@@ -77,6 +78,8 @@ private fun SettingsRoute(vm: SettingsViewModel) {
     val quality by vm.quality.collectAsState()
     val acrylic by vm.drawerAcrylic.collectAsState()
     val forecastDropMs by vm.forecastDropMs.collectAsState()
+    val coordEdgePadDp by vm.coordEdgePadDp.collectAsState()
+    val coordGridPadDp by vm.coordGridPadDp.collectAsState()
 
     HanaBackdrop { hazeState ->
     Column(
@@ -132,6 +135,42 @@ private fun SettingsRoute(vm: SettingsViewModel) {
         HanaSection(Copy.boardSection, hazeState) {
             ToggleRow(Copy.confirmMove, confirm, vm::setConfirmMove)
             ToggleRow(Copy.showCoords, coords, vm::setShowCoords)
+        }
+        HanaSection(Copy.coordPad, hazeState, hint = Copy.coordPadHint) {
+            Text(Copy.coordEdgePad, color = hanaColors.text, fontSize = 13.sp)
+            Text(
+                Copy.coordPadValue(coordEdgePadDp),
+                color = hanaColors.accentLilac,
+                fontSize = 13.sp,
+            )
+            Slider(
+                value = coordEdgePadDp.toFloat(),
+                onValueChange = { vm.setCoordEdgePadDp(it.toInt().coerceIn(0, COORD_PAD_DP_MAX)) },
+                valueRange = 0f..COORD_PAD_DP_MAX.toFloat(),
+                steps = COORD_PAD_DP_MAX - 1,
+                colors = SliderDefaults.colors(
+                    thumbColor = hanaColors.accentPink,
+                    activeTrackColor = hanaColors.accentPink,
+                    inactiveTrackColor = hanaColors.stroke,
+                ),
+            )
+            Text(Copy.coordGridPad, color = hanaColors.text, fontSize = 13.sp)
+            Text(
+                Copy.coordPadValue(coordGridPadDp),
+                color = hanaColors.accentLilac,
+                fontSize = 13.sp,
+            )
+            Slider(
+                value = coordGridPadDp.toFloat(),
+                onValueChange = { vm.setCoordGridPadDp(it.toInt().coerceIn(0, COORD_PAD_DP_MAX)) },
+                valueRange = 0f..COORD_PAD_DP_MAX.toFloat(),
+                steps = COORD_PAD_DP_MAX - 1,
+                colors = SliderDefaults.colors(
+                    thumbColor = hanaColors.accentPink,
+                    activeTrackColor = hanaColors.accentPink,
+                    inactiveTrackColor = hanaColors.stroke,
+                ),
+            )
         }
         HanaSection(Copy.forecastDrop, hazeState, hint = Copy.forecastDropHint) {
             val seconds = forecastDropMs / 1000f

@@ -11,6 +11,8 @@ import com.acite.katahana.engine.EngineStatus
 import com.acite.katahana.engine.TestResult
 import com.acite.katahana.domain.GameConfig
 import com.acite.katahana.settings.AnalysisLayoutMode
+import com.acite.katahana.settings.COORD_EDGE_PAD_DP_DEFAULT
+import com.acite.katahana.settings.COORD_GRID_PAD_DP_DEFAULT
 import com.acite.katahana.settings.FORECAST_DROP_MS_DEFAULT
 import com.acite.katahana.settings.OwnershipStyle
 import com.acite.katahana.settings.QualityThresholds
@@ -81,6 +83,12 @@ class SettingsViewModel(
     val forecastDropMs: StateFlow<Int> = repo.forecastDropMs.stateIn(
         viewModelScope, SharingStarted.WhileSubscribed(1_000), FORECAST_DROP_MS_DEFAULT,
     )
+    val coordEdgePadDp: StateFlow<Int> = repo.coordEdgePadDp.stateIn(
+        viewModelScope, SharingStarted.WhileSubscribed(1_000), COORD_EDGE_PAD_DP_DEFAULT,
+    )
+    val coordGridPadDp: StateFlow<Int> = repo.coordGridPadDp.stateIn(
+        viewModelScope, SharingStarted.WhileSubscribed(1_000), COORD_GRID_PAD_DP_DEFAULT,
+    )
     val lastGame: StateFlow<GameConfig> = repo.lastGame.stateIn(
         viewModelScope, SharingStarted.WhileSubscribed(1_000), GameConfig(),
     )
@@ -102,6 +110,8 @@ class SettingsViewModel(
     fun setQuality(value: QualityThresholds) = launch { repo.setQuality(value) }
     fun setDrawerAcrylic(value: Float) = launch { repo.setDrawerAcrylic(value) }
     fun setForecastDropMs(value: Int) = launch { repo.setForecastDropMs(value) }
+    fun setCoordEdgePadDp(value: Int) = launch { repo.setCoordEdgePadDp(value) }
+    fun setCoordGridPadDp(value: Int) = launch { repo.setCoordGridPadDp(value) }
 
     fun testConnection() {
         if (_testBusy.value) return

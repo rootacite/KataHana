@@ -23,7 +23,7 @@ DataStore。**所有设置都以“Flow + setter”成对出现**，UI/VM 用
 
 | 组 | 键（示例） | 说明 |
 | --- | --- | --- |
-| 显示开关 | `show_coords / show_candidates / show_quality / show_connections / show_ownership / show_dead_stones`、`confirm_move` | 棋盘显示与“确认落子” |
+| 显示开关 | `show_coords / show_candidates / show_quality / show_connections / show_ownership / show_dead_stones`、`confirm_move`、`coord_edge_pad_dp`(5)、`coord_grid_pad_dp`(3) | 棋盘显示、确认落子、坐标到边缘/过子的间距 |
 | 外观 | `appearance`（默认 `sky_sakura`）、`drawer_acrylic`（浮点）、`ownership_style`、`analysis_layout`（`auto` / `compact` / `expanded`） | 主题、抽屉模糊度、窄屏分析面板（三栏或 Tab） |
 | 引擎 | `engine_name / engine_url / engine_token`、`play_visits`(400)、`review_visits`(400)、`forecast_drop_ms`(400，上限 3000) | 连接与访问量预算 |
 | 质量阈值 | `quality_blunder/big/mistake/inacc/fair`（12/6/3/1.5/0.5） | 复盘“损失目数→档位”分界，封装成 `QualityThresholds` |

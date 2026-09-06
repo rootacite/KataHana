@@ -108,6 +108,8 @@ private fun SessionRoute(vm: SessionViewModel) {
     val ownershipStyle by vm.ownershipStyle.collectAsState()
     val drawerAcrylic by vm.drawerAcrylic.collectAsState()
     val analysisLayoutMode by vm.analysisLayoutMode.collectAsState()
+    val coordEdgePadDp by vm.coordEdgePadDp.collectAsState()
+    val coordGridPadDp by vm.coordGridPadDp.collectAsState()
     val navigator = LocalNavigator.currentOrThrow
     val snapshot = ui.snapshot
     val boardCandidates = if (showCandidates) ui.candidates else emptyList()
@@ -290,6 +292,8 @@ private fun SessionRoute(vm: SessionViewModel) {
                             deadPoints = if (showDeadStones) ui.deadPoints else emptySet(),
                             forecast = ui.forecast,
                             forecastRevealed = ui.forecastRevealed,
+                            edgePadDp = coordEdgePadDp,
+                            gridPadDp = coordGridPadDp,
                         )
                     }
                     when {

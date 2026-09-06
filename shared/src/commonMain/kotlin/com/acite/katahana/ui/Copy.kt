@@ -155,6 +155,12 @@ object Copy {
         "${((seconds * 10f).toInt() / 10f)} s per stone"
     const val confirmMove = "Confirm before placing"
     const val showCoords = "Show coordinates"
+    const val coordPad = "Coordinate padding"
+    const val coordPadHint =
+        "From the board edge, and past the stones so labels never sit under a stone."
+    const val coordEdgePad = "To the edge"
+    const val coordGridPad = "Past the stones"
+    fun coordPadValue(dp: Int): String = "$dp dp"
     const val appearance = "Appearance"
     const val appearanceHint = "Stone colors and the winrate bar."
     const val analysisLayout = "Analysis panels"

@@ -7,10 +7,7 @@ import kotlin.math.roundToInt
 
 internal const val TAP_MAX_GAPS = 0.62f
 internal const val SLIDE_MAX_GAPS = 0.85f
-/** Wood past the stone (stones are `0.46` gaps). */
-internal const val BOARD_MARGIN_GAPS = 0.75f
-/** Extra strip outside the wood for GTP labels. */
-internal const val COORD_BAND_GAPS = 0.58f
+internal const val STONE_RADIUS_GAPS = 0.46f
 internal const val COORD_FONT_GAP_FRACTION = 0.48f
 internal const val COORD_THIN_GLYPH_FRACTION = 0.9f
 
@@ -29,16 +26,31 @@ internal data class BoardLayout(
     val canvasH: Float,
     val boardSize: Int,
     val showCoords: Boolean,
+    val edgePadPx: Float = 0f,
+    val gridPadPx: Float = 0f,
 ) {
     val side: Float = min(canvasW, canvasH)
     val originX: Float = (canvasW - side) / 2f
     val originY: Float = (canvasH - side) / 2f
     private val last: Int = (boardSize - 1).coerceAtLeast(1)
-    private val marginGaps: Float =
-        BOARD_MARGIN_GAPS + if (showCoords) COORD_BAND_GAPS else 0f
-    val gap: Float = side / (last + 2f * marginGaps)
-    val coordBand: Float = if (showCoords) gap * COORD_BAND_GAPS else 0f
-    val inset: Float = gap * marginGaps
+    val gap: Float
+    val fontPx: Float
+    val stoneR: Float
+    val inset: Float
+    val coordCenter: Float
+
+    init {
+        val n = last.toFloat()
+        val edge = edgePadPx.coerceAtLeast(0f)
+        val inner = gridPadPx.coerceAtLeast(0f)
+        val frac = STONE_RADIUS_GAPS + if (showCoords) COORD_FONT_GAP_FRACTION else 0f
+        val pad = if (showCoords) edge + inner else edge
+        gap = ((side - 2f * pad) / (n + 2f * frac)).coerceAtLeast(1f)
+        fontPx = if (showCoords) COORD_FONT_GAP_FRACTION * gap else 0f
+        stoneR = STONE_RADIUS_GAPS * gap
+        inset = if (showCoords) edge + fontPx + stoneR + inner else stoneR + edge
+        coordCenter = edge + fontPx / 2f
+    }
 
     fun xOf(x: Int): Float = originX + inset + x * gap
     fun yOf(y: Int): Float = originY + inset + y * gap

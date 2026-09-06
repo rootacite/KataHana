@@ -73,27 +73,45 @@ class BoardHitTest {
         )
         val fontPx = coordFontPx(dense.gap)
         assertTrue(fontPx < dense.gap)
-        assertEquals(dense.gap * COORD_BAND_GAPS, dense.coordBand)
+        assertEquals(fontPx, dense.fontPx)
     }
 
     @Test
-    fun woodMarginIsAFractionOfGapNotBoardSide() {
-        val plain = BoardLayout(1080f, 1080f, 19, showCoords = false)
-        assertEquals(plain.gap * BOARD_MARGIN_GAPS, plain.inset)
-        assertTrue(plain.inset / plain.side < 0.04f)
-        val labelled = BoardLayout(1080f, 1080f, 19, showCoords = true)
-        assertEquals(labelled.gap * (BOARD_MARGIN_GAPS + COORD_BAND_GAPS), labelled.inset)
+    fun coordPadsSitOutsideTheFontAndPastTheStones() {
+        val edge = 15f
+        val inner = 9f
+        val plain = BoardLayout(
+            1080f, 1080f, 19,
+            showCoords = false,
+            edgePadPx = edge,
+            gridPadPx = inner,
+        )
+        assertEquals(plain.stoneR + edge, plain.inset, 0.02f)
+        val labelled = BoardLayout(
+            1080f, 1080f, 19,
+            showCoords = true,
+            edgePadPx = edge,
+            gridPadPx = inner,
+        )
+        assertEquals(edge + labelled.fontPx + labelled.stoneR + inner, labelled.inset, 0.02f)
+        assertEquals(edge + labelled.fontPx / 2f, labelled.coordCenter, 0.02f)
         assertTrue(labelled.inset > plain.inset)
-        assertTrue(labelled.inset / labelled.side < 0.065f)
-        assertTrue(coordFontPx(labelled.gap) <= labelled.coordBand)
+        assertTrue(coordFontPx(labelled.gap) <= labelled.fontPx + 0.02f)
+        val widerEdge = BoardLayout(
+            1080f, 1080f, 19,
+            showCoords = true,
+            edgePadPx = 40f,
+            gridPadPx = inner,
+        )
+        assertTrue(widerEdge.inset > labelled.inset)
+        assertTrue(widerEdge.coordCenter > labelled.coordCenter)
     }
 
     @Test
-    fun coordBandScalesWithGap() {
-        val small = BoardLayout(320f, 320f, 19, showCoords = true)
-        val large = BoardLayout(1080f, 1080f, 19, showCoords = true)
-        assertTrue(small.coordBand < large.coordBand)
-        assertEquals(small.gap * COORD_BAND_GAPS, small.coordBand)
+    fun coordFontScalesWithGap() {
+        val small = BoardLayout(320f, 320f, 19, showCoords = true, edgePadPx = 8f, gridPadPx = 5f)
+        val large = BoardLayout(1080f, 1080f, 19, showCoords = true, edgePadPx = 8f, gridPadPx = 5f)
+        assertTrue(small.fontPx < large.fontPx)
         assertTrue(coordFontPx(small.gap) < small.gap)
     }
 

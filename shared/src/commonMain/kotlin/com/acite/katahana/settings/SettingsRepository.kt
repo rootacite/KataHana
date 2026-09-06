@@ -25,6 +25,9 @@ import okio.Path.Companion.toPath
 
 const val FORECAST_DROP_MS_DEFAULT = 400
 const val FORECAST_DROP_MS_MAX = 3000
+const val COORD_EDGE_PAD_DP_DEFAULT = 5
+const val COORD_GRID_PAD_DP_DEFAULT = 3
+const val COORD_PAD_DP_MAX = 24
 
 data class QualityThresholds(
     val blunder: Float = 12f,
@@ -70,6 +73,12 @@ class SettingsRepository {
     val reviewVisits: Flow<Int> = dataStore.data.map { it[Keys.REVIEW_VISITS] ?: 400 }
     val forecastDropMs: Flow<Int> = dataStore.data.map {
         (it[Keys.FORECAST_DROP_MS] ?: FORECAST_DROP_MS_DEFAULT).coerceIn(0, FORECAST_DROP_MS_MAX)
+    }
+    val coordEdgePadDp: Flow<Int> = dataStore.data.map {
+        (it[Keys.COORD_EDGE_PAD_DP] ?: COORD_EDGE_PAD_DP_DEFAULT).coerceIn(0, COORD_PAD_DP_MAX)
+    }
+    val coordGridPadDp: Flow<Int> = dataStore.data.map {
+        (it[Keys.COORD_GRID_PAD_DP] ?: COORD_GRID_PAD_DP_DEFAULT).coerceIn(0, COORD_PAD_DP_MAX)
     }
     val engineProfile: Flow<EngineProfile> = dataStore.data.map { prefs ->
         EngineProfile(
@@ -133,6 +142,12 @@ class SettingsRepository {
     suspend fun setForecastDropMs(value: Int) = edit {
         it[Keys.FORECAST_DROP_MS] = value.coerceIn(0, FORECAST_DROP_MS_MAX)
     }
+    suspend fun setCoordEdgePadDp(value: Int) = edit {
+        it[Keys.COORD_EDGE_PAD_DP] = value.coerceIn(0, COORD_PAD_DP_MAX)
+    }
+    suspend fun setCoordGridPadDp(value: Int) = edit {
+        it[Keys.COORD_GRID_PAD_DP] = value.coerceIn(0, COORD_PAD_DP_MAX)
+    }
     suspend fun setLastGame(value: GameConfig) = edit {
         it[Keys.LAST_SIZE] = value.boardSize
         it[Keys.LAST_KOMI] = value.komi
@@ -176,6 +191,8 @@ class SettingsRepository {
         val PLAY_VISITS = intPreferencesKey("play_visits")
         val REVIEW_VISITS = intPreferencesKey("review_visits")
         val FORECAST_DROP_MS = intPreferencesKey("forecast_drop_ms")
+        val COORD_EDGE_PAD_DP = intPreferencesKey("coord_edge_pad_dp")
+        val COORD_GRID_PAD_DP = intPreferencesKey("coord_grid_pad_dp")
         val Q_BLUNDER = floatPreferencesKey("quality_blunder")
         val Q_BIG = floatPreferencesKey("quality_big")
         val Q_MISTAKE = floatPreferencesKey("quality_mistake")

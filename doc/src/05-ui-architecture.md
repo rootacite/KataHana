@@ -87,8 +87,9 @@ internal fun computeSessionLayout(
 2. 势力图层（`Overlays.drawOwnershipLayer`：三种风格
    `Blocks`（逐点方块）/ `Fog`（8×8 双线性场雾）/ `Constellation`（星丛连线），
    各带独立无限动画与透明度）；
-3. 星位 → GTP 坐标带（字号 = `gap * 0.48` 像素再 `toSp()`，粗体，落在外侧
-   `0.58` 格的标签带里；字形宽超过格距 0.9 时只画偶数路与两端，避免窄屏字母重叠）；
+3. 星位 → GTP 坐标带（字号 = `gap * 0.48` 像素再 `toSp()`，粗体。从棋盘边缘起
+   依次是 `edgePad`（默认 5dp）、标签、子半径 + `gridPad`（默认 3dp）才到网格；
+   两项可在设置里调。字形宽超过格距 0.9 时只画偶数路与两端）；
 4. **棋子下方的连接形状**（`Connections.kt`：长连/小尖/飞/跳，虚线、二次曲线带
    “外靠”偏移，随上一步的落子有生长动画）——名字就说明它是垫在棋子下面的；
 5. 真实棋子（`Stones.drawStone`：径向渐变 + 高光 + 描边；落子有 squash 弹簧、
@@ -99,9 +100,9 @@ internal fun computeSessionLayout(
 9. 局势预测：加载圈 + 编号虚子（透明棋子 + 手数/损失标签）。
 
 棋子之上的交互全部经**命中测试** `BoardHit.kt` 把指针位置换算成交点：
-`BoardLayout` 先算棋盘正方形、边距与格距：木边是 `0.75` 格（刚过子半径
-`0.46`），开坐标时再加 `0.58` 格的标签带，标签画在这条带的中线，不要按棋盘
-边长百分比留白。`nearestIntersection` 找最近的格点，
+`BoardLayout` 先算棋盘正方形、边距与格距：关坐标时 inset = 子半径 +
+`edgePad`；开坐标时 inset = `edgePad` + 字高 + 子半径 + `gridPad`，标签中心在
+`edgePad + 字高/2`，这样调“到边缘”不会把数字推离网格。`nearestIntersection` 找最近的格点，
 距离超过阈值就视为点空（点击 `.62` 格、滑动 `.85` 格）。两条指针管线分开实现：
 
 - **鼠标**：悬停出幽灵子（`onHover`），按下抬起 = 落子

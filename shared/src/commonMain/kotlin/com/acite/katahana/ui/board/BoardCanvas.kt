@@ -32,6 +32,7 @@ import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
 import androidx.compose.ui.input.pointer.isSecondaryPressed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
@@ -49,6 +50,8 @@ import com.acite.katahana.ai.QualityMark
 import com.acite.katahana.engine.Candidate
 import com.acite.katahana.engine.formatScoreLoss
 import com.acite.katahana.engine.lerpOwnership
+import com.acite.katahana.settings.COORD_EDGE_PAD_DP_DEFAULT
+import com.acite.katahana.settings.COORD_GRID_PAD_DP_DEFAULT
 import com.acite.katahana.settings.OwnershipStyle
 import com.acite.katahana.ui.theme.HanaMotion
 import com.acite.katahana.ui.theme.hanaAppearance
@@ -74,7 +77,12 @@ fun BoardCanvas(
     deadPoints: Set<Point> = emptySet(),
     forecast: Forecast? = null,
     forecastRevealed: Int = 0,
+    edgePadDp: Int = COORD_EDGE_PAD_DP_DEFAULT,
+    gridPadDp: Int = COORD_GRID_PAD_DP_DEFAULT,
 ) {
+    val density = LocalDensity.current
+    val edgePadPx = with(density) { edgePadDp.dp.toPx() }
+    val gridPadPx = with(density) { gridPadDp.dp.toPx() }
     val squash = remember { Animatable(1f) }
     val captureFlight = remember { Animatable(1f) }
     var departing by remember { mutableStateOf(emptyList<DepartingStone>()) }
@@ -225,6 +233,8 @@ fun BoardCanvas(
             .pointerInput(
                 boardSize,
                 showCoords,
+                edgePadPx,
+                gridPadPx,
                 snapshot.ended,
                 snapshot.aiToPlay,
                 snapshot.moveNumber,
@@ -241,6 +251,8 @@ fun BoardCanvas(
                             size.height.toFloat(),
                             boardSize,
                             showCoords,
+                            edgePadPx = edgePadPx,
+                            gridPadPx = gridPadPx,
                         )
                         val point = nearestIntersection(change.position, layout, TAP_MAX_GAPS)
                         when (event.type) {
@@ -273,6 +285,8 @@ fun BoardCanvas(
             .pointerInput(
                 boardSize,
                 showCoords,
+                edgePadPx,
+                gridPadPx,
                 snapshot.ended,
                 snapshot.aiToPlay,
                 snapshot.moveNumber,
@@ -285,7 +299,14 @@ fun BoardCanvas(
                     if (snapshot.ended || snapshot.aiToPlay) return@awaitEachGesture
                     val canvasW = size.width.toFloat()
                     val canvasH = size.height.toFloat()
-                    fun layout() = BoardLayout(canvasW, canvasH, boardSize, showCoords)
+                    fun layout() = BoardLayout(
+                        canvasW,
+                        canvasH,
+                        boardSize,
+                        showCoords,
+                        edgePadPx = edgePadPx,
+                        gridPadPx = gridPadPx,
+                    )
                     fun snap(at: Offset, maxGaps: Float): Point? {
                         val point = nearestIntersection(at, layout(), maxGaps) ?: return null
                         return if (snapshot.stoneAt(point.x, point.y) != null) null else point
@@ -369,7 +390,14 @@ fun BoardCanvas(
                 }
             },
     ) {
-        val layout = BoardLayout(this.size.width, this.size.height, boardSize, showCoords)
+        val layout = BoardLayout(
+            this.size.width,
+            this.size.height,
+            boardSize,
+            showCoords,
+            edgePadPx = edgePadPx,
+            gridPadPx = gridPadPx,
+        )
         val boardCorner = (layout.gap * 0.22f).coerceIn(6.dp.toPx(), 10.dp.toPx())
         drawRoundRect(
             color = colors.boardBg,
@@ -432,10 +460,10 @@ fun BoardCanvas(
                 fontWeight = FontWeight.Bold,
             )
             val letters = gtpLetters(boardSize)
-            val topBand = layout.originY + layout.coordBand * 0.5f
-            val botBand = layout.originY + layout.side - layout.coordBand * 0.5f
-            val leftBand = layout.originX + layout.coordBand * 0.5f
-            val rightBand = layout.originX + layout.side - layout.coordBand * 0.5f
+            val topBand = layout.originY + layout.coordCenter
+            val botBand = layout.originY + layout.side - layout.coordCenter
+            val leftBand = layout.originX + layout.coordCenter
+            val rightBand = layout.originX + layout.side - layout.coordCenter
             var widest = 0
             val measuredLetters = Array(boardSize) { i ->
                 measurer.measure(letters[i], style).also { widest = maxOf(widest, it.size.width) }
@@ -458,7 +486,7 @@ fun BoardCanvas(
                 drawText(number, topLeft = Offset(rightBand - number.size.width / 2f, ny))
             }
         }
-        val stoneR = layout.gap * 0.46f
+        val stoneR = layout.stoneR
         val shownForecast = forecast?.revealed(forecastRevealed)
         val captured = shownForecast?.captured.orEmpty()
         val virtualStones = shownForecast?.stones.orEmpty()

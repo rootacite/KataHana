@@ -57,6 +57,8 @@ import com.acite.katahana.recents.seatSgfName
 import com.acite.katahana.recents.toRecentAiStyle
 import com.acite.katahana.recents.toRecentMode
 import com.acite.katahana.settings.AnalysisLayoutMode
+import com.acite.katahana.settings.COORD_EDGE_PAD_DP_DEFAULT
+import com.acite.katahana.settings.COORD_GRID_PAD_DP_DEFAULT
 import com.acite.katahana.settings.OwnershipStyle
 import com.acite.katahana.settings.QualityThresholds
 import com.acite.katahana.settings.SettingsRepository
@@ -218,6 +220,16 @@ class SessionViewModel(
         viewModelScope,
         SharingStarted.WhileSubscribed(1_000),
         AnalysisLayoutMode.Default,
+    )
+    val coordEdgePadDp: StateFlow<Int> = settings.coordEdgePadDp.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(1_000),
+        COORD_EDGE_PAD_DP_DEFAULT,
+    )
+    val coordGridPadDp: StateFlow<Int> = settings.coordGridPadDp.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(1_000),
+        COORD_GRID_PAD_DP_DEFAULT,
     )
     val quality: StateFlow<QualityThresholds> = settings.quality.stateIn(
         viewModelScope,
