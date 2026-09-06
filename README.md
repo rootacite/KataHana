@@ -62,7 +62,7 @@ The app opens on the home screen, which is built around two cards over a soft da
   <img src="screenshots/home.jpg" alt="Home — recent games, a git-tagged changelog, and a version label read from the latest tag"/>
 </p>
 
-The second card is **What's new**, a changelog that is generated from the project's own git history. Tagged commits carry a colored chip, and nothing is written by hand: the list is produced at build time from `git log`, and the version shown in the corner is taken from the nearest git tag (`v1.6.1` on the current tree, `v0.1-alpha` when the tree has no tags). This is described again in the code-layout section, because the mechanism lives in the Gradle build rather than in the app.
+The second card is **What's new**, a changelog that is generated from the project's own git history. Tagged commits carry a colored chip, and nothing is written by hand: the list is produced at build time from `git log`, and the version shown in the corner is taken from the nearest git tag (`v1.6.2` on the current tree, `v0.1-alpha` when the tree has no tags). This is described again in the code-layout section, because the mechanism lives in the Gradle build rather than in the app.
 
 ---
 
