@@ -187,7 +187,7 @@ class SessionViewModel(
     val showCandidates: StateFlow<Boolean> = settings.showCandidates.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(1_000),
-        true,
+        false,
     )
     val showQuality: StateFlow<Boolean> = settings.showQuality.stateIn(
         viewModelScope,

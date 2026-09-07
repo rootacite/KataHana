@@ -30,7 +30,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -148,6 +150,11 @@ private fun SessionRoute(vm: SessionViewModel) {
             sgfFiles.save(vm.sgfFileName(), vm.sgfText())
         }
     }
+    @Suppress("DEPRECATION")
+    val clipboard = LocalClipboardManager.current
+    val copySgf: () -> Unit = {
+        clipboard.setText(AnnotatedString(vm.sgfText()))
+    }
     val actuallyLeave: () -> Unit = {
         vm.leave()
         drawerOpen = false
@@ -245,6 +252,7 @@ private fun SessionRoute(vm: SessionViewModel) {
                             nameAsk = true
                         },
                         onExportSgf = exportSgf,
+                        onCopySgf = copySgf,
                         onBack = requestLeave,
                         onSettings = {
                             drawerOpen = false

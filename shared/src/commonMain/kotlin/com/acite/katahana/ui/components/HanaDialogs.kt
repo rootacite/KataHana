@@ -21,8 +21,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -35,6 +38,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.acite.katahana.ui.Copy
@@ -151,7 +155,8 @@ private fun InstantScrimModal(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val sheet = alignment == Alignment.BottomCenter
-    Box(Modifier.fillMaxSize()) {
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val cap = sheetMaxHeight(maxHeight, sheet)
         Box(
             Modifier
                 .fillMaxSize()
@@ -165,14 +170,16 @@ private fun InstantScrimModal(
                 .align(alignment)
                 .padding(if (sheet) 0.dp else 20.dp)
                 .then(if (sheet) Modifier.fillMaxWidth() else Modifier)
+                .heightIn(max = cap)
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
                     onClick = {},
                 ),
             hazeState = hazeState,
-            content = content,
-        )
+        ) {
+            ScrollableModalBody(content)
+        }
     }
 }
 
@@ -234,7 +241,8 @@ private fun CinematicScrimModal(
             modifier = modifier
                 .align(alignment)
                 .padding(if (sheet) 0.dp else 20.dp)
-                .then(if (sheet) Modifier.fillMaxWidth() else Modifier),
+                .then(if (sheet) Modifier.fillMaxWidth() else Modifier)
+                .heightIn(max = sheetMaxHeight(maxHeight, sheet)),
             enter = slideInVertically(
                 animationSpec = tween(SheetSlideMs, easing = FastOutSlowInEasing),
                 initialOffsetY = { screenH },
@@ -245,19 +253,35 @@ private fun CinematicScrimModal(
             ),
         ) {
             FrostedSurface(
-                modifier = Modifier.clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    onClick = {},
-                ),
+                modifier = Modifier
+                    .heightIn(max = sheetMaxHeight(maxHeight, sheet))
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = {},
+                    ),
                 hazeState = hazeState,
                 blurRadius = 48.dp,
                 panelAlpha = 0.64f,
                 cardAlpha = 0.50f,
-                content = content,
-            )
+            ) {
+                ScrollableModalBody(content)
+            }
         }
     }
+}
+
+private fun sheetMaxHeight(windowHeight: Dp, sheet: Boolean): Dp =
+    windowHeight - if (sheet) 0.dp else 40.dp
+
+@Composable
+private fun ScrollableModalBody(content: @Composable ColumnScope.() -> Unit) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .verticalScroll(rememberScrollState()),
+        content = content,
+    )
 }
 
 @Composable

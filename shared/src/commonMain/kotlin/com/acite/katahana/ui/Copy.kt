@@ -20,6 +20,8 @@ object Copy {
     const val save = "Save"
     const val saveAs = "Save as"
     const val exportSgf = "Export SGF"
+    const val copySgf = "Copy SGF"
+    const val sgfCopied = "Copied"
     const val saveGame = "Save game"
     const val gameName = "Name"
     const val unsavedLeave = "Save this game before leaving?"

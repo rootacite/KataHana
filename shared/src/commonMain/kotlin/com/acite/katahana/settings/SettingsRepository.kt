@@ -47,7 +47,7 @@ class SettingsRepository {
 
     val confirmMove: Flow<Boolean> = dataStore.data.map { it[Keys.CONFIRM_MOVE] ?: false }
     val showCoords: Flow<Boolean> = dataStore.data.map { it[Keys.SHOW_COORDS] ?: true }
-    val showCandidates: Flow<Boolean> = dataStore.data.map { it[Keys.SHOW_CANDIDATES] ?: true }
+    val showCandidates: Flow<Boolean> = dataStore.data.map { it[Keys.SHOW_CANDIDATES] ?: false }
     val showQuality: Flow<Boolean> = dataStore.data.map { it[Keys.SHOW_QUALITY] ?: true }
     val showConnections: Flow<Boolean> = dataStore.data.map { it[Keys.SHOW_CONNECTIONS] ?: false }
     val showOwnership: Flow<Boolean> = dataStore.data.map { it[Keys.SHOW_OWNERSHIP] ?: false }

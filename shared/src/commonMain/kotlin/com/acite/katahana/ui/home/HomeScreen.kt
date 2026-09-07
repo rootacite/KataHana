@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
@@ -163,7 +164,11 @@ private fun HomeRoute() {
                 onDismiss = { newMode = null },
                 hazeState = overlayHaze,
                 alignment = if (landscape) Alignment.Center else Alignment.BottomCenter,
-                modifier = if (landscape) Modifier.width(420.dp) else Modifier.fillMaxWidth(),
+                modifier = if (landscape) {
+                    Modifier.widthIn(max = 420.dp).fillMaxWidth()
+                } else {
+                    Modifier.fillMaxWidth()
+                },
                 slideFromBottom = true,
             ) {
                 NewGameSheet(onStart = start, initial = lastGame, lockedMode = newMode)
