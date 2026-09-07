@@ -14,6 +14,7 @@ import kotlin.random.Random
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
@@ -24,7 +25,10 @@ import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.selects.onTimeout
+import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
@@ -65,7 +69,7 @@ class AnalysisClient(
 
     fun analyzeLive(sessionId: String, tree: GameTree) {
         val profile = currentProfile
-        if (profile.url.isBlank()) return
+        if (parseEngineUrls(profile.url).isEmpty()) return
         if (!_status.value.online && _status.value.phase != EnginePhase.Connecting) return
         val nodeId = tree.current.id
         val existing = inFlight
@@ -460,7 +464,7 @@ class AnalysisClient(
     suspend fun testConnection(): TestResult {
         val profile = settings.engineProfile.first()
         currentProfile = profile
-        if (profile.url.isBlank()) return TestResult.Fail("Set a WebSocket URL first.")
+        if (parseEngineUrls(profile.url).isEmpty()) return TestResult.Fail("Set a WebSocket URL first.")
         val id = "test:${Random.nextLong().toULong().toString(16)}"
         val deferred = CompletableDeferred<AnalysisResponse>()
         waitersMutex.withLock { waiters[id] = QueryWaiter.OneShot(deferred) }
@@ -508,16 +512,18 @@ class AnalysisClient(
 
     private suspend fun awaitOnline() {
         if (_status.value.online) return
-        withTimeout(12_000) {
+        withTimeout(ENGINE_AWAIT_ONLINE_MS) {
             status.first { it.online }
         }
     }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     private suspend fun runConnection(profile: EngineProfile) {
         outbound?.close()
         outbound = null
         inFlight = null
-        if (profile.url.isBlank()) {
+        val urls = parseEngineUrls(profile.url)
+        if (urls.isEmpty()) {
             _status.value = EngineStatus(EnginePhase.Disconnected)
             _live.value = null
             return
@@ -525,29 +531,69 @@ class AnalysisClient(
         var backoff = 1_000L
         while (true) {
             _status.value = EngineStatus(EnginePhase.Connecting)
-            val channel = Channel<String>(Channel.BUFFERED)
-            outbound = channel
-            try {
-                ws.connect(
-                    url = profile.url,
-                    token = profile.token,
-                    outgoing = channel,
-                    onOpen = {
-                        backoff = 1_000L
-                        _status.value = EngineStatus(EnginePhase.Ready)
-                    },
-                    onText = { text -> handleFrame(text) },
-                )
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
+            var lastError: String? = null
+            var held = false
+            for (url in urls) {
+                _status.value = EngineStatus(EnginePhase.Connecting, url)
+                val opened = CompletableDeferred<Unit>()
+                val channel = Channel<String>(Channel.BUFFERED)
+                outbound = channel
+                coroutineScope {
+                    val session = launch {
+                        try {
+                            ws.connect(
+                                url = url,
+                                token = profile.token,
+                                outgoing = channel,
+                                onOpen = {
+                                    backoff = 1_000L
+                                    opened.complete(Unit)
+                                    _status.value = EngineStatus(EnginePhase.Ready)
+                                },
+                                onText = { text -> handleFrame(text) },
+                            )
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            opened.completeExceptionally(e)
+                        } finally {
+                            if (outbound === channel) outbound = null
+                            channel.close()
+                        }
+                    }
+                    val handshake = try {
+                        select<Boolean> {
+                            opened.onAwait { true }
+                            session.onJoin { false }
+                            onTimeout(ENGINE_HANDSHAKE_MS) { false }
+                        }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        lastError = e.message?.take(160) ?: "Connection failed"
+                        false
+                    }
+                    if (handshake) {
+                        held = true
+                        session.join()
+                    } else {
+                        if (lastError == null) {
+                            lastError = if (session.isCompleted) {
+                                "Connection failed"
+                            } else {
+                                "Handshake timed out"
+                            }
+                        }
+                        session.cancel()
+                    }
+                }
+                if (held) break
+            }
+            if (!held) {
                 _status.value = EngineStatus(
                     EnginePhase.Error,
-                    e.message?.take(160) ?: "Connection failed",
+                    lastError ?: "Connection failed",
                 )
-            } finally {
-                if (outbound === channel) outbound = null
-                channel.close()
             }
             delay(backoff)
             backoff = (backoff * 2).coerceAtMost(15_000L)

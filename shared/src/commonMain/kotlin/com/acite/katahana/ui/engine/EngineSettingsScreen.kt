@@ -88,7 +88,14 @@ private fun EngineSettingsRoute(vm: SettingsViewModel) {
                 hint = if (engineStatus.online) null else Copy.engineOfflineHint,
             ) {
                 HanaField(Copy.engineName, name, vm::setEngineName)
-                HanaField(Copy.url, url, vm::setEngineUrl, placeholder = "ws://127.0.0.1:2080")
+                HanaField(
+                    Copy.url,
+                    url,
+                    vm::setEngineUrl,
+                    placeholder = "ws://127.0.0.1:2080; ws://192.168.1.10:2080",
+                    minLines = 2,
+                )
+                Text(Copy.urlHint, color = hanaColors.textDim, fontSize = 13.sp)
                 HanaField(Copy.token, token, vm::setEngineToken)
                 HanaField(
                     Copy.playVisits,

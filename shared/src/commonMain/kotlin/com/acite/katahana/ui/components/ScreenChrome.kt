@@ -28,6 +28,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.acite.katahana.generated.AppInfo
@@ -229,16 +230,19 @@ fun PorcelainCard(
 fun FrostedSurface(
     modifier: Modifier = Modifier,
     hazeState: HazeState? = null,
+    blurRadius: Dp = 24.dp,
+    panelAlpha: Float = 0.58f,
+    cardAlpha: Float = 0.42f,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val tokens = hanaTokens
     val colors = hanaColors
-    val tint = colors.bgPanel.copy(alpha = 0.58f)
+    val tint = colors.bgPanel.copy(alpha = panelAlpha)
     val fallback = colors.bgPanel.copy(alpha = 0.78f)
-    val cardTint = colors.bgCard.copy(alpha = 0.42f)
-    val blurStyle = remember(tint, fallback, cardTint) {
+    val cardTint = colors.bgCard.copy(alpha = cardAlpha)
+    val blurStyle = remember(tint, fallback, cardTint, blurRadius) {
         HazeBlurStyle {
-            blurRadius(24.dp)
+            blurRadius(blurRadius)
             backgroundColor(tint)
             colorEffects(listOf(HazeColorEffect.tint(cardTint)))
             noiseFactor(0.05f)

@@ -164,6 +164,7 @@ private fun HomeRoute() {
                 hazeState = overlayHaze,
                 alignment = if (landscape) Alignment.Center else Alignment.BottomCenter,
                 modifier = if (landscape) Modifier.width(420.dp) else Modifier.fillMaxWidth(),
+                slideFromBottom = true,
             ) {
                 NewGameSheet(onStart = start, initial = lastGame, lockedMode = newMode)
             }

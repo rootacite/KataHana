@@ -3,9 +3,12 @@ package com.acite.katahana.ui.session
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -20,11 +23,13 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -43,6 +48,7 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.acite.katahana.settings.AnalysisColWeights
 import com.acite.katahana.domain.EvalGraphMode
 import com.acite.katahana.domain.EvalSample
 import com.acite.katahana.domain.QualityStats
@@ -69,7 +75,7 @@ private val PlotPadR = 14.dp
 private enum class AnalysisTab { Tree, Score, Quality }
 
 @Composable
-fun SessionTreeColumn(
+fun SessionAnalysisPane(
     layout: TreeLayout,
     reviewing: Boolean,
     onGoToNode: (String) -> Unit,
@@ -80,6 +86,10 @@ fun SessionTreeColumn(
     stats: QualityStats,
     modifier: Modifier = Modifier,
     tabbed: Boolean = false,
+    columns: Boolean = false,
+    weights: AnalysisColWeights = AnalysisColWeights.Default,
+    onWeightsChange: (AnalysisColWeights) -> Unit = {},
+    onWeightsCommit: () -> Unit = {},
 ) {
     if (tabbed) {
         TabbedAnalysisPane(
@@ -95,38 +105,41 @@ fun SessionTreeColumn(
         )
         return
     }
-    Column(
-        modifier,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        GameTreeCard(
+    if (columns) {
+        AnalysisColumns(
             layout = layout,
             reviewing = reviewing,
             onGoToNode = onGoToNode,
-            compact = true,
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth(),
-        )
-        EvalGraphCard(
             samples = samples,
             currentMoveNumber = currentMoveNumber,
-            mode = graphMode,
-            onMode = onGraphMode,
-            onSeek = onGoToNode,
-            compact = true,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        QualityStatsCard(
+            graphMode = graphMode,
+            onGraphMode = onGraphMode,
             stats = stats,
-            compact = true,
-            modifier = Modifier.fillMaxWidth(),
+            weights = weights,
+            onWeightsChange = onWeightsChange,
+            onWeightsCommit = onWeightsCommit,
+            modifier = modifier,
+        )
+    } else {
+        AnalysisRows(
+            layout = layout,
+            reviewing = reviewing,
+            onGoToNode = onGoToNode,
+            samples = samples,
+            currentMoveNumber = currentMoveNumber,
+            graphMode = graphMode,
+            onGraphMode = onGraphMode,
+            stats = stats,
+            weights = weights,
+            onWeightsChange = onWeightsChange,
+            onWeightsCommit = onWeightsCommit,
+            modifier = modifier,
         )
     }
 }
 
 @Composable
-fun SessionTreeRow(
+private fun AnalysisRows(
     layout: TreeLayout,
     reviewing: Boolean,
     onGoToNode: (String) -> Unit,
@@ -135,54 +148,199 @@ fun SessionTreeRow(
     graphMode: EvalGraphMode,
     onGraphMode: (EvalGraphMode) -> Unit,
     stats: QualityStats,
+    weights: AnalysisColWeights,
+    onWeightsChange: (AnalysisColWeights) -> Unit,
+    onWeightsCommit: () -> Unit,
     modifier: Modifier = Modifier,
-    tabbed: Boolean = false,
 ) {
-    if (tabbed) {
-        TabbedAnalysisPane(
-            layout = layout,
-            reviewing = reviewing,
-            onGoToNode = onGoToNode,
-            samples = samples,
-            currentMoveNumber = currentMoveNumber,
-            graphMode = graphMode,
-            onGraphMode = onGraphMode,
-            stats = stats,
-            modifier = modifier,
-        )
-        return
+    val density = LocalDensity.current
+    val latestWeights by rememberUpdatedState(weights)
+    val latestChange by rememberUpdatedState(onWeightsChange)
+    BoxWithConstraints(modifier) {
+        val totalPx = with(density) { (maxHeight - SessionResizeHandleWidth * 2).toPx() }
+        val minPx = with(density) { SessionTreeRowMinSlice.toPx() }
+        Column(Modifier.fillMaxSize()) {
+            GameTreeCard(
+                layout = layout,
+                reviewing = reviewing,
+                onGoToNode = onGoToNode,
+                compact = true,
+                modifier = Modifier
+                    .weight(weights.tree)
+                    .fillMaxWidth(),
+            )
+            AnalysisResizeHandle(
+                vertical = true,
+                onDrag = { dy ->
+                    latestChange(
+                        applyAnalysisSplitterDrag(latestWeights, 0, dy, totalPx, minPx),
+                    )
+                },
+                onDragEnd = onWeightsCommit,
+            )
+            EvalGraphCard(
+                samples = samples,
+                currentMoveNumber = currentMoveNumber,
+                mode = graphMode,
+                onMode = onGraphMode,
+                onSeek = onGoToNode,
+                compact = true,
+                expandPlot = true,
+                modifier = Modifier
+                    .weight(weights.graph)
+                    .fillMaxWidth(),
+            )
+            AnalysisResizeHandle(
+                vertical = true,
+                onDrag = { dy ->
+                    latestChange(
+                        applyAnalysisSplitterDrag(latestWeights, 1, dy, totalPx, minPx),
+                    )
+                },
+                onDragEnd = onWeightsCommit,
+            )
+            QualityStatsCard(
+                stats = stats,
+                compact = true,
+                modifier = Modifier
+                    .weight(weights.quality)
+                    .fillMaxWidth(),
+            )
+        }
     }
-    Row(
-        modifier,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+}
+
+@Composable
+private fun AnalysisColumns(
+    layout: TreeLayout,
+    reviewing: Boolean,
+    onGoToNode: (String) -> Unit,
+    samples: List<EvalSample>,
+    currentMoveNumber: Int,
+    graphMode: EvalGraphMode,
+    onGraphMode: (EvalGraphMode) -> Unit,
+    stats: QualityStats,
+    weights: AnalysisColWeights,
+    onWeightsChange: (AnalysisColWeights) -> Unit,
+    onWeightsCommit: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val density = LocalDensity.current
+    val latestWeights by rememberUpdatedState(weights)
+    val latestChange by rememberUpdatedState(onWeightsChange)
+    BoxWithConstraints(modifier) {
+        val totalPx = with(density) { (maxWidth - SessionResizeHandleWidth * 2).toPx() }
+        val minPx = with(density) { SessionTreeColMinWidth.toPx() }
+        Row(Modifier.fillMaxSize()) {
+            GameTreeCard(
+                layout = layout,
+                reviewing = reviewing,
+                onGoToNode = onGoToNode,
+                compact = true,
+                modifier = Modifier
+                    .weight(weights.tree)
+                    .fillMaxHeight(),
+            )
+            AnalysisResizeHandle(
+                onDrag = { dx ->
+                    latestChange(
+                        applyAnalysisSplitterDrag(latestWeights, 0, dx, totalPx, minPx),
+                    )
+                },
+                onDragEnd = onWeightsCommit,
+            )
+            EvalGraphCard(
+                samples = samples,
+                currentMoveNumber = currentMoveNumber,
+                mode = graphMode,
+                onMode = onGraphMode,
+                onSeek = onGoToNode,
+                compact = true,
+                expandPlot = true,
+                modifier = Modifier
+                    .weight(weights.graph)
+                    .fillMaxHeight(),
+            )
+            AnalysisResizeHandle(
+                onDrag = { dx ->
+                    latestChange(
+                        applyAnalysisSplitterDrag(latestWeights, 1, dx, totalPx, minPx),
+                    )
+                },
+                onDragEnd = onWeightsCommit,
+            )
+            QualityStatsCard(
+                stats = stats,
+                compact = true,
+                modifier = Modifier
+                    .weight(weights.quality)
+                    .fillMaxHeight(),
+            )
+        }
+    }
+}
+
+@Composable
+internal fun AnalysisResizeHandle(
+    onDrag: (Float) -> Unit,
+    onDragEnd: () -> Unit,
+    modifier: Modifier = Modifier,
+    vertical: Boolean = false,
+) {
+    val tokens = hanaTokens
+    val latestDrag by rememberUpdatedState(onDrag)
+    val latestEnd by rememberUpdatedState(onDragEnd)
+    Box(
+        modifier
+            .then(
+                if (vertical) {
+                    Modifier
+                        .fillMaxWidth()
+                        .height(SessionResizeHandleWidth)
+                } else {
+                    Modifier
+                        .width(SessionResizeHandleWidth)
+                        .fillMaxHeight()
+                },
+            )
+            .pointerInput(vertical) {
+                if (vertical) {
+                    detectVerticalDragGestures(
+                        onDragEnd = { latestEnd() },
+                        onDragCancel = { latestEnd() },
+                        onVerticalDrag = { change, dy ->
+                            change.consume()
+                            latestDrag(dy)
+                        },
+                    )
+                } else {
+                    detectHorizontalDragGestures(
+                        onDragEnd = { latestEnd() },
+                        onDragCancel = { latestEnd() },
+                        onHorizontalDrag = { change, dx ->
+                            change.consume()
+                            latestDrag(dx)
+                        },
+                    )
+                }
+            },
+        contentAlignment = Alignment.Center,
     ) {
-        GameTreeCard(
-            layout = layout,
-            reviewing = reviewing,
-            onGoToNode = onGoToNode,
-            compact = true,
-            modifier = Modifier
-                .weight(1.15f)
-                .fillMaxHeight(),
-        )
-        EvalGraphCard(
-            samples = samples,
-            currentMoveNumber = currentMoveNumber,
-            mode = graphMode,
-            onMode = onGraphMode,
-            onSeek = onGoToNode,
-            compact = true,
-            expandPlot = true,
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxHeight(),
-        )
-        QualityStatsCard(
-            stats = stats,
-            compact = true,
-            modifier = Modifier
-                .weight(0.9f)
-                .fillMaxHeight(),
+        Box(
+            Modifier
+                .then(
+                    if (vertical) {
+                        Modifier
+                            .width(28.dp)
+                            .height(2.dp)
+                    } else {
+                        Modifier
+                            .width(2.dp)
+                            .height(28.dp)
+                    },
+                )
+                .clip(tokens.capsule)
+                .background(hanaColors.accentPink.copy(alpha = 0.55f)),
         )
     }
 }

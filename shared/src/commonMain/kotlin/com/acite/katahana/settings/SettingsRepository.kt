@@ -64,6 +64,22 @@ class SettingsRepository {
     val analysisLayoutMode: Flow<AnalysisLayoutMode> = dataStore.data.map {
         AnalysisLayoutMode.fromId(it[Keys.ANALYSIS_LAYOUT])
     }
+    val analysisArrangement: Flow<AnalysisArrangement> = dataStore.data.map {
+        AnalysisArrangement.fromId(it[Keys.ANALYSIS_ARRANGEMENT])
+    }
+    val analysisSideWidthDp: Flow<Int> = dataStore.data.map {
+        (it[Keys.ANALYSIS_SIDE_WIDTH_DP] ?: ANALYSIS_SIDE_WIDTH_DP_DEFAULT)
+            .coerceAtLeast(ANALYSIS_SIDE_WIDTH_DP_MIN)
+    }
+    val analysisColWeights: Flow<AnalysisColWeights> = dataStore.data.map {
+        AnalysisColWeights.parse(it[Keys.ANALYSIS_COL_WEIGHTS])
+    }
+    val analysisRowWeights: Flow<AnalysisColWeights> = dataStore.data.map {
+        AnalysisColWeights.parse(
+            it[Keys.ANALYSIS_ROW_WEIGHTS],
+            AnalysisColWeights.DefaultRows,
+        )
+    }
     val engineName: Flow<String> = dataStore.data.map { it[Keys.ENGINE_NAME] ?: "KataGo" }
     val engineUrl: Flow<String> = dataStore.data.map {
         it[Keys.ENGINE_URL] ?: EngineProfile.DEFAULT_URL
@@ -134,6 +150,18 @@ class SettingsRepository {
     suspend fun setAnalysisLayoutMode(value: AnalysisLayoutMode) = edit {
         it[Keys.ANALYSIS_LAYOUT] = value.id
     }
+    suspend fun setAnalysisArrangement(value: AnalysisArrangement) = edit {
+        it[Keys.ANALYSIS_ARRANGEMENT] = value.id
+    }
+    suspend fun setAnalysisSideWidthDp(value: Int) = edit {
+        it[Keys.ANALYSIS_SIDE_WIDTH_DP] = value.coerceAtLeast(ANALYSIS_SIDE_WIDTH_DP_MIN)
+    }
+    suspend fun setAnalysisColWeights(value: AnalysisColWeights) = edit {
+        it[Keys.ANALYSIS_COL_WEIGHTS] = AnalysisColWeights.format(value)
+    }
+    suspend fun setAnalysisRowWeights(value: AnalysisColWeights) = edit {
+        it[Keys.ANALYSIS_ROW_WEIGHTS] = AnalysisColWeights.format(value)
+    }
     suspend fun setEngineName(value: String) = edit { it[Keys.ENGINE_NAME] = value }
     suspend fun setEngineUrl(value: String) = edit { it[Keys.ENGINE_URL] = value }
     suspend fun setEngineToken(value: String) = edit { it[Keys.ENGINE_TOKEN] = value }
@@ -185,6 +213,10 @@ class SettingsRepository {
         val OWNERSHIP_STYLE = stringPreferencesKey("ownership_style")
         val APPEARANCE = stringPreferencesKey("appearance")
         val ANALYSIS_LAYOUT = stringPreferencesKey("analysis_layout")
+        val ANALYSIS_ARRANGEMENT = stringPreferencesKey("analysis_arrangement")
+        val ANALYSIS_SIDE_WIDTH_DP = intPreferencesKey("analysis_side_width_dp")
+        val ANALYSIS_COL_WEIGHTS = stringPreferencesKey("analysis_col_weights")
+        val ANALYSIS_ROW_WEIGHTS = stringPreferencesKey("analysis_row_weights")
         val ENGINE_NAME = stringPreferencesKey("engine_name")
         val ENGINE_URL = stringPreferencesKey("engine_url")
         val ENGINE_TOKEN = stringPreferencesKey("engine_token")

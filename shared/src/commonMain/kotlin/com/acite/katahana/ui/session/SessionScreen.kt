@@ -1,5 +1,8 @@
 package com.acite.katahana.ui.session
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -27,14 +30,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlin.math.roundToInt
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.core.screen.ScreenKey
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
+import com.acite.katahana.settings.AnalysisColWeights
 import com.acite.katahana.domain.GameConfig
 import com.acite.katahana.domain.GameTree
 import com.acite.katahana.domain.SessionSnapshot
@@ -108,6 +114,10 @@ private fun SessionRoute(vm: SessionViewModel) {
     val ownershipStyle by vm.ownershipStyle.collectAsState()
     val drawerAcrylic by vm.drawerAcrylic.collectAsState()
     val analysisLayoutMode by vm.analysisLayoutMode.collectAsState()
+    val analysisArrangement by vm.analysisArrangement.collectAsState()
+    val analysisSideWidthDp by vm.analysisSideWidthDp.collectAsState()
+    val analysisColWeights by vm.analysisColWeights.collectAsState()
+    val analysisRowWeights by vm.analysisRowWeights.collectAsState()
     val coordEdgePadDp by vm.coordEdgePadDp.collectAsState()
     val coordGridPadDp by vm.coordGridPadDp.collectAsState()
     val navigator = LocalNavigator.currentOrThrow
@@ -122,6 +132,14 @@ private fun SessionRoute(vm: SessionViewModel) {
     var nameThenLeave by remember { mutableStateOf(false) }
     var nameDraft by remember { mutableStateOf("") }
     var editColor by remember { mutableStateOf<StoneColor?>(null) }
+    var liveSideWidthDp by remember { mutableStateOf<Int?>(null) }
+    var liveColWeights by remember { mutableStateOf<AnalysisColWeights?>(null) }
+    var liveRowWeights by remember { mutableStateOf<AnalysisColWeights?>(null) }
+    val drawerProgress by animateFloatAsState(
+        targetValue = if (drawerOpen) 1f else 0f,
+        animationSpec = tween(SessionDrawerAnimMs, easing = FastOutSlowInEasing),
+        label = "session-drawer",
+    )
     LaunchedEffect(drawerOpen, editColor) {
         vm.setPaused(drawerOpen || editColor != null)
     }
@@ -170,40 +188,18 @@ private fun SessionRoute(vm: SessionViewModel) {
             .background(hanaColors.bgApp),
     ) {
         val landscape = getPlatform().isMobile && maxWidth > maxHeight
+        val portraitWindow = maxHeight >= maxWidth
         val chromePad = if (landscape) 4.dp else 8.dp
         val humanTurn = snapshot.humanControls && !snapshot.ended
-        val hazeState = rememberHazeState()
         val overlayHaze = rememberHazeState()
-        Column(
-            Modifier
-                .fillMaxSize()
-                .padding(top = chromePad)
-                .hazeSource(overlayHaze),
-        ) {
-            if (!landscape) {
-                SessionTopBar(
-                    status = ui.engineStatus,
-                    blackWinrate = ui.blackWinrate?.toFloat(),
-                    compact = false,
-                    onMenu = { drawerOpen = true },
-                    snapshot = snapshot,
-                    hasSelection = ui.selected != null,
-                    humanTurn = humanTurn,
-                    onPass = vm::pass,
-                    onUndo = vm::undo,
-                    onRedo = vm::redo,
-                    onConfirm = vm::confirmSelected,
-                    forecastActive = ui.forecast != null,
-                    onEndForecast = vm::endForecast,
-                    onExitReview = vm::exitReview,
-                )
-            }
-            HanaDrawer(
-                open = drawerOpen,
-                onOpenChange = { drawerOpen = it },
-                acrylic = drawerAcrylic,
-                hazeState = hazeState,
-                drawerContent = {
+        HanaDrawer(
+            open = drawerOpen,
+            onOpenChange = { drawerOpen = it },
+            acrylic = drawerAcrylic,
+            hazeState = overlayHaze,
+            edge = if (portraitWindow) HanaDrawerEdge.Bottom else HanaDrawerEdge.End,
+            progress = drawerProgress,
+            drawerContent = {
                     SidePanel(
                         snapshot = snapshot,
                         hasSelection = ui.selected != null,
@@ -257,21 +253,80 @@ private fun SessionRoute(vm: SessionViewModel) {
                         onEditSeat = { editColor = it },
                         modifier = Modifier.fillMaxSize(),
                     )
-                },
+            },
+        ) {
+            Column(
+                Modifier
+                    .fillMaxSize()
+                    .padding(top = chromePad)
+                    .hazeSource(overlayHaze),
             ) {
+                if (!landscape) {
+                    SessionTopBar(
+                        status = ui.engineStatus,
+                        blackWinrate = ui.blackWinrate?.toFloat(),
+                        compact = false,
+                        onMenu = { drawerOpen = !drawerOpen },
+                        snapshot = snapshot,
+                        hasSelection = ui.selected != null,
+                        humanTurn = humanTurn,
+                        onPass = vm::pass,
+                        onUndo = vm::undo,
+                        onRedo = vm::redo,
+                        onConfirm = vm::confirmSelected,
+                        forecastActive = ui.forecast != null,
+                        onEndForecast = vm::endForecast,
+                        onExitReview = vm::exitReview,
+                    )
+                }
                 BoxWithConstraints(
                     Modifier
                         .fillMaxSize()
-                        .hazeSource(hazeState)
                         .padding(chromePad),
                 ) {
+                    val density = LocalDensity.current
+                    val preferredTreeW = (liveSideWidthDp ?: analysisSideWidthDp).dp
                     val layout = computeSessionLayout(
                         maxWidth = maxWidth,
                         maxHeight = maxHeight,
                         mobile = getPlatform().isMobile,
                         chromePad = chromePad,
                         analysisMode = analysisLayoutMode,
+                        preferredTreeW = preferredTreeW,
+                        arrangement = analysisArrangement,
                     )
+                    val paneWeights = if (layout.analysisColumns) {
+                        liveColWeights ?: analysisColWeights
+                    } else {
+                        liveRowWeights ?: analysisRowWeights
+                    }
+                    val analysisPane: @Composable (Modifier) -> Unit = { paneMod ->
+                        SessionAnalysisPane(
+                            layout = ui.tree,
+                            reviewing = snapshot.reviewing,
+                            onGoToNode = vm::goToNode,
+                            samples = ui.evalSamples,
+                            currentMoveNumber = snapshot.moveNumber,
+                            graphMode = ui.evalGraphMode,
+                            onGraphMode = vm::setEvalGraphMode,
+                            stats = ui.qualityStats,
+                            tabbed = layout.tabbedAnalysis,
+                            columns = layout.analysisColumns,
+                            weights = paneWeights,
+                            onWeightsChange = {
+                                if (layout.analysisColumns) liveColWeights = it
+                                else liveRowWeights = it
+                            },
+                            onWeightsCommit = {
+                                if (layout.analysisColumns) {
+                                    vm.setAnalysisColWeights(liveColWeights ?: paneWeights)
+                                } else {
+                                    vm.setAnalysisRowWeights(liveRowWeights ?: paneWeights)
+                                }
+                            },
+                            modifier = paneMod,
+                        )
+                    }
                     val board: @Composable () -> Unit = {
                         BoardCanvas(
                             snapshot = snapshot,
@@ -298,17 +353,8 @@ private fun SessionRoute(vm: SessionViewModel) {
                     when {
                         layout.showTopTree -> {
                             Column(Modifier.fillMaxSize()) {
-                                SessionTreeRow(
-                                    layout = ui.tree,
-                                    reviewing = snapshot.reviewing,
-                                    onGoToNode = vm::goToNode,
-                                    samples = ui.evalSamples,
-                                    currentMoveNumber = snapshot.moveNumber,
-                                    graphMode = ui.evalGraphMode,
-                                    onGraphMode = vm::setEvalGraphMode,
-                                    stats = ui.qualityStats,
-                                    tabbed = layout.tabbedAnalysis,
-                                    modifier = Modifier
+                                analysisPane(
+                                    Modifier
                                         .fillMaxWidth()
                                         .height(layout.treeH),
                                 )
@@ -327,27 +373,28 @@ private fun SessionRoute(vm: SessionViewModel) {
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 if (layout.showSideTree) {
-                                    SessionTreeColumn(
-                                        layout = ui.tree,
-                                        reviewing = snapshot.reviewing,
-                                        onGoToNode = vm::goToNode,
-                                        samples = ui.evalSamples,
-                                        currentMoveNumber = snapshot.moveNumber,
-                                        graphMode = ui.evalGraphMode,
-                                        onGraphMode = vm::setEvalGraphMode,
-                                        stats = ui.qualityStats,
-                                        tabbed = layout.tabbedAnalysis,
-                                        modifier = Modifier
+                                    analysisPane(
+                                        Modifier
                                             .width(layout.treeW)
                                             .fillMaxHeight(),
                                     )
-                                    Spacer(Modifier.width(chromePad))
+                                    AnalysisResizeHandle(
+                                        onDrag = { dx ->
+                                            val dxDp = with(density) { dx.toDp() }
+                                            val next = (layout.treeW + dxDp)
+                                                .coerceIn(SessionTreeMinWidth, layout.maxTreeW)
+                                            liveSideWidthDp = next.value.roundToInt()
+                                        },
+                                        onDragEnd = {
+                                            liveSideWidthDp?.let { vm.setAnalysisSideWidthDp(it) }
+                                        },
+                                    )
                                 }
                                 if (layout.showRail) {
                                     SessionRail(
                                         status = ui.engineStatus,
                                         blackWinrate = ui.blackWinrate?.toFloat(),
-                                        onMenu = { drawerOpen = true },
+                                        onMenu = { drawerOpen = !drawerOpen },
                                         snapshot = snapshot,
                                         hasSelection = ui.selected != null,
                                         humanTurn = humanTurn,

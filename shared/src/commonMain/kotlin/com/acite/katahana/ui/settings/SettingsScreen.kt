@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.sp
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
+import com.acite.katahana.settings.AnalysisArrangement
 import com.acite.katahana.settings.AnalysisLayoutMode
 import com.acite.katahana.settings.COORD_PAD_DP_MAX
 import com.acite.katahana.settings.FORECAST_DROP_MS_MAX
@@ -74,6 +75,7 @@ private fun SettingsRoute(vm: SettingsViewModel) {
     val coords by vm.showCoords.collectAsState()
     val appearanceId by vm.appearanceId.collectAsState()
     val analysisLayoutMode by vm.analysisLayoutMode.collectAsState()
+    val analysisArrangement by vm.analysisArrangement.collectAsState()
     val ownershipStyle by vm.ownershipStyle.collectAsState()
     val quality by vm.quality.collectAsState()
     val acrylic by vm.drawerAcrylic.collectAsState()
@@ -111,6 +113,34 @@ private fun SettingsRoute(vm: SettingsViewModel) {
                     Column(Modifier.weight(1f)) {
                         Text(analysisLayoutTitle(mode), color = hanaColors.text, fontSize = 15.sp)
                         Text(analysisLayoutBlurb(mode), color = hanaColors.textDim, fontSize = 12.sp)
+                    }
+                }
+            }
+        }
+        HanaSection(
+            Copy.analysisArrangement,
+            hazeState,
+            hint = Copy.analysisArrangementHint,
+        ) {
+            val arrangementEnabled = analysisLayoutMode != AnalysisLayoutMode.Compact
+            AnalysisArrangement.entries.forEach { arrangement ->
+                val selected = arrangement == analysisArrangement
+                HanaChoiceRow(
+                    selected = selected,
+                    enabled = arrangementEnabled,
+                    onClick = { vm.setAnalysisArrangement(arrangement) },
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            analysisArrangementTitle(arrangement),
+                            color = hanaColors.text,
+                            fontSize = 15.sp,
+                        )
+                        Text(
+                            analysisArrangementBlurb(arrangement),
+                            color = hanaColors.textDim,
+                            fontSize = 12.sp,
+                        )
                     }
                 }
             }
@@ -238,6 +268,18 @@ private fun analysisLayoutBlurb(mode: AnalysisLayoutMode): String = when (mode) 
     AnalysisLayoutMode.Auto -> Copy.analysisLayoutAutoHint
     AnalysisLayoutMode.Compact -> Copy.analysisLayoutCompactHint
     AnalysisLayoutMode.Expanded -> Copy.analysisLayoutExpandedHint
+}
+
+private fun analysisArrangementTitle(arrangement: AnalysisArrangement): String = when (arrangement) {
+    AnalysisArrangement.Auto -> Copy.analysisArrangementAuto
+    AnalysisArrangement.Rows -> Copy.analysisArrangementRows
+    AnalysisArrangement.Columns -> Copy.analysisArrangementColumns
+}
+
+private fun analysisArrangementBlurb(arrangement: AnalysisArrangement): String = when (arrangement) {
+    AnalysisArrangement.Auto -> Copy.analysisArrangementAutoHint
+    AnalysisArrangement.Rows -> Copy.analysisArrangementRowsHint
+    AnalysisArrangement.Columns -> Copy.analysisArrangementColumnsHint
 }
 
 private fun styleTitle(style: OwnershipStyle): String = when (style) {

@@ -27,7 +27,7 @@ fun SeatDialog(
     hazeState: HazeState,
 ) {
     val title = if (color == StoneColor.Black) Copy.black else Copy.white
-    HanaDialogCard(onDismiss = onDismiss, hazeState = hazeState) {
+    HanaDialogCard(onDismiss = onDismiss, hazeState = hazeState, slideFromBottom = true) {
         Text(title, color = hanaColors.text, fontSize = 18.sp)
         Spacer(Modifier.height(14.dp))
         ChoiceRow {

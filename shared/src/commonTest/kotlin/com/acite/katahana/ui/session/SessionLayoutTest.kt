@@ -1,6 +1,8 @@
 package com.acite.katahana.ui.session
 
 import androidx.compose.ui.unit.dp
+import com.acite.katahana.settings.AnalysisArrangement
+import com.acite.katahana.settings.AnalysisColWeights
 import com.acite.katahana.settings.AnalysisLayoutMode
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -95,5 +97,96 @@ class SessionLayoutTest {
         )
         assertTrue(layout.showTopTree)
         assertFalse(layout.tabbedAnalysis)
+    }
+
+    @Test
+    fun preferredSideWidthUsesLeftoverWithoutShrinkingBoard() {
+        val wide = computeSessionLayout(
+            1400.dp,
+            800.dp,
+            mobile = false,
+            chromePad = 8.dp,
+            preferredTreeW = 400.dp,
+        )
+        assertEquals(800.dp, wide.boardSide)
+        assertEquals(400.dp, wide.treeW)
+        assertTrue(wide.maxTreeW >= 400.dp)
+
+        val clamped = computeSessionLayout(
+            1400.dp,
+            800.dp,
+            mobile = false,
+            chromePad = 8.dp,
+            preferredTreeW = 900.dp,
+        )
+        assertEquals(800.dp, clamped.boardSide)
+        assertEquals(clamped.maxTreeW, clamped.treeW)
+        assertTrue(clamped.treeW < 900.dp)
+    }
+
+    @Test
+    fun preferredSideWidthDoesNotGoBelowMin() {
+        val layout = computeSessionLayout(
+            1400.dp,
+            800.dp,
+            mobile = false,
+            chromePad = 8.dp,
+            preferredTreeW = 100.dp,
+        )
+        assertEquals(SessionTreeMinWidth, layout.treeW)
+    }
+
+    @Test
+    fun autoArrangementIsColumnsInPortraitAndRowsInLandscape() {
+        assertTrue(resolveAnalysisColumns(AnalysisArrangement.Auto, portrait = true))
+        assertFalse(resolveAnalysisColumns(AnalysisArrangement.Auto, portrait = false))
+        assertFalse(resolveAnalysisColumns(AnalysisArrangement.Rows, portrait = true))
+        assertTrue(resolveAnalysisColumns(AnalysisArrangement.Columns, portrait = false))
+    }
+
+    @Test
+    fun defaultArrangementIsRowsInBothOrientations() {
+        val portrait = computeSessionLayout(800.dp, 1200.dp, mobile = false, chromePad = 8.dp)
+        val landscape = computeSessionLayout(1400.dp, 800.dp, mobile = false, chromePad = 8.dp)
+        assertFalse(portrait.analysisColumns)
+        assertFalse(landscape.analysisColumns)
+        assertEquals(AnalysisArrangement.Rows, AnalysisArrangement.Default)
+    }
+
+    @Test
+    fun parseColWeightsFallsBackOnJunk() {
+        assertEquals(AnalysisColWeights.Default, AnalysisColWeights.parse(null))
+        assertEquals(AnalysisColWeights.Default, AnalysisColWeights.parse(""))
+        assertEquals(AnalysisColWeights.Default, AnalysisColWeights.parse("1,2"))
+        assertEquals(AnalysisColWeights.Default, AnalysisColWeights.parse("1,0,1"))
+        assertEquals(AnalysisColWeights(2f, 3f, 4f), AnalysisColWeights.parse(" 2, 3 ,4 "))
+        val roundTrip = AnalysisColWeights(2f, 3f, 4f)
+        assertEquals(roundTrip, AnalysisColWeights.parse(AnalysisColWeights.format(roundTrip)))
+    }
+
+    @Test
+    fun splitterDragKeepsEachColumnAboveMin() {
+        val start = AnalysisColWeights(100f, 100f, 100f)
+        val moved = applyAnalysisSplitterDrag(
+            weights = start,
+            splitter = 0,
+            deltaPx = 80f,
+            totalPx = 300f,
+            minPx = 20f,
+        )
+        assertEquals(180f, moved.tree)
+        assertEquals(20f, moved.graph)
+        assertEquals(100f, moved.quality)
+
+        val blocked = applyAnalysisSplitterDrag(
+            weights = start,
+            splitter = 0,
+            deltaPx = 200f,
+            totalPx = 300f,
+            minPx = 96f,
+        )
+        assertEquals(104f, blocked.tree)
+        assertEquals(96f, blocked.graph)
+        assertEquals(100f, blocked.quality)
     }
 }

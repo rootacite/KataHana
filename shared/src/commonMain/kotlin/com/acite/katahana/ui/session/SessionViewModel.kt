@@ -56,6 +56,9 @@ import com.acite.katahana.recents.defaultRecentTitle
 import com.acite.katahana.recents.seatSgfName
 import com.acite.katahana.recents.toRecentAiStyle
 import com.acite.katahana.recents.toRecentMode
+import com.acite.katahana.settings.ANALYSIS_SIDE_WIDTH_DP_DEFAULT
+import com.acite.katahana.settings.AnalysisArrangement
+import com.acite.katahana.settings.AnalysisColWeights
 import com.acite.katahana.settings.AnalysisLayoutMode
 import com.acite.katahana.settings.COORD_EDGE_PAD_DP_DEFAULT
 import com.acite.katahana.settings.COORD_GRID_PAD_DP_DEFAULT
@@ -221,6 +224,26 @@ class SessionViewModel(
         SharingStarted.WhileSubscribed(1_000),
         AnalysisLayoutMode.Default,
     )
+    val analysisArrangement: StateFlow<AnalysisArrangement> = settings.analysisArrangement.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(1_000),
+        AnalysisArrangement.Default,
+    )
+    val analysisSideWidthDp: StateFlow<Int> = settings.analysisSideWidthDp.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(1_000),
+        ANALYSIS_SIDE_WIDTH_DP_DEFAULT,
+    )
+    val analysisColWeights: StateFlow<AnalysisColWeights> = settings.analysisColWeights.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(1_000),
+        AnalysisColWeights.Default,
+    )
+    val analysisRowWeights: StateFlow<AnalysisColWeights> = settings.analysisRowWeights.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(1_000),
+        AnalysisColWeights.DefaultRows,
+    )
     val coordEdgePadDp: StateFlow<Int> = settings.coordEdgePadDp.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(1_000),
@@ -264,6 +287,18 @@ class SessionViewModel(
 
     fun setShowCoords(value: Boolean) {
         viewModelScope.launch { settings.setShowCoords(value) }
+    }
+
+    fun setAnalysisSideWidthDp(value: Int) {
+        viewModelScope.launch { settings.setAnalysisSideWidthDp(value) }
+    }
+
+    fun setAnalysisColWeights(value: AnalysisColWeights) {
+        viewModelScope.launch { settings.setAnalysisColWeights(value) }
+    }
+
+    fun setAnalysisRowWeights(value: AnalysisColWeights) {
+        viewModelScope.launch { settings.setAnalysisRowWeights(value) }
     }
 
     private val _state = MutableStateFlow(

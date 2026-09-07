@@ -25,6 +25,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -85,12 +86,14 @@ fun HanaChoiceRow(
     selected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
     content: @Composable RowScope.() -> Unit,
 ) {
     val tokens = hanaTokens
     val colors = hanaColors
     Row(
         modifier
+            .alpha(if (enabled) 1f else 0.45f)
             .fillMaxWidth()
             .clip(tokens.panel)
             .background(
@@ -103,7 +106,7 @@ fun HanaChoiceRow(
                 else Color.White.copy(alpha = 0.08f),
                 tokens.panel,
             )
-            .clickable(onClick = onClick)
+            .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         content = content,
@@ -322,14 +325,18 @@ fun HanaField(
     onChange: (String) -> Unit,
     placeholder: String? = null,
     keyboard: KeyboardType = KeyboardType.Text,
+    minLines: Int = 1,
 ) {
     val colors = hanaColors
+    val single = minLines <= 1
     OutlinedTextField(
         value = value,
         onValueChange = onChange,
         label = { Text(label) },
         placeholder = placeholder?.let { { Text(it, color = colors.textDim) } },
-        singleLine = true,
+        singleLine = single,
+        minLines = if (single) 1 else minLines,
+        maxLines = if (single) 1 else 4,
         keyboardOptions = KeyboardOptions(keyboardType = keyboard),
         shape = hanaTokens.panel,
         colors = OutlinedTextFieldDefaults.colors(

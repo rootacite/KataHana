@@ -94,6 +94,7 @@ object Copy {
     const val captured = "Captured"
     const val toPlay = "To play"
     const val url = "WebSocket URL"
+    const val urlHint = "Separate several addresses with ; — the first one that answers is used."
     const val token = "Token (optional)"
     const val playVisits = "Play visits"
     const val reviewVisits = "Review visits"
@@ -172,6 +173,17 @@ object Copy {
     const val analysisLayoutCompactHint = "One card: game tree, score, and quality."
     const val analysisLayoutExpanded = "Three cards"
     const val analysisLayoutExpandedHint = "Always show the tree, graph, and quality cards."
+    const val analysisArrangement = "Three-card layout"
+    const val analysisArrangementHint =
+        "How the tree, score, and quality cards sit when they are not tabbed."
+    const val analysisArrangementAuto = "Auto"
+    const val analysisArrangementAutoHint = "Columns in portrait, rows beside the board."
+    const val analysisArrangementRows = "Three rows"
+    const val analysisArrangementRowsHint =
+        "Stack the three cards from top to bottom. Drag the seams to resize."
+    const val analysisArrangementColumns = "Three columns"
+    const val analysisArrangementColumnsHint =
+        "Place the three cards side by side. Drag the seams to resize."
     const val qualityTab = "Quality"
     const val ownershipStyle = "Ownership style"
     const val ownershipStyleHint = "How the heat sits on the cloth."

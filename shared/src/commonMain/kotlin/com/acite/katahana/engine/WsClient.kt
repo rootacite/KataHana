@@ -8,6 +8,12 @@ import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
+internal const val ENGINE_HANDSHAKE_MS = 4_000L
+internal const val ENGINE_AWAIT_ONLINE_MS = 20_000L
+
+internal fun parseEngineUrls(raw: String): List<String> =
+    raw.split(';').map { it.trim() }.filter { it.isNotEmpty() }
+
 internal fun normalizeEngineUrl(raw: String, token: String = ""): String {
     var url = raw.trim()
     if (url.isEmpty()) return url
