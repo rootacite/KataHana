@@ -23,7 +23,7 @@ DataStore。**所有设置都以“Flow + setter”成对出现**，UI/VM 用
 
 | 组 | 键（示例） | 说明 |
 | --- | --- | --- |
-| 显示开关 | `show_coords / show_candidates / show_quality / show_connections / show_ownership / show_dead_stones`、`confirm_move`、`coord_edge_pad_dp`(5)、`coord_grid_pad_dp`(3) | 棋盘显示、确认落子、坐标到边缘/过子的间距 |
+| 显示开关 | `show_coords`（默认开）/ `show_candidates`（Top moves，**默认关**）/ `show_quality`（默认开）/ `show_connections / show_ownership / show_dead_stones`（默认关）、`confirm_move`、`coord_edge_pad_dp`(5)、`coord_grid_pad_dp`(3) | 棋盘显示、确认落子、坐标到边缘/过子的间距 |
 | 外观 | `appearance`（默认 `sky_sakura`）、`drawer_acrylic`（浮点）、`ownership_style`、`analysis_layout`（`auto` / `compact` / `expanded`）、`analysis_arrangement`（默认 `rows`；另有 `auto` / `columns`）、`analysis_side_width_dp`（默认 280）、`analysis_col_weights`（默认 `1.15,1,0.9`）、`analysis_row_weights`（默认 `1.4,1,0.8`） | 主题、抽屉模糊度、分析面板（三栏或 Tab、三行/三列、侧栏宽度与行列比） |
 | 引擎 | `engine_name / engine_url / engine_token`、`play_visits`(400)、`review_visits`(400)、`forecast_drop_ms`(400，上限 3000) | 连接与访问量预算 |
 | 质量阈值 | `quality_blunder/big/mistake/inacc/fair`（12/6/3/1.5/0.5） | 复盘“损失目数→档位”分界，封装成 `QualityThresholds` |

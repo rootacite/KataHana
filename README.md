@@ -111,7 +111,7 @@ The evaluation shown in the graph and the quality table is collected move by mov
 
 ### Saving and records
 
-Saving works through the drawer: **Save** updates the current record, and **Save as** stores a copy under a new name. Both write the game to the recent list together with the per-move evaluations, which is what allows the evaluation curve and the quality counts to come back after a restart. Because the app tracks whether the position has changed since the last save, backing out of the game screen with unsaved moves triggers a dialog that offers to save, discard or cancel. SGF files can be opened and exported as well, in FF[4] format, which is the interchange format used by most other Go tools.
+Saving works through the drawer: **Save** updates the current record, and **Save as** stores a copy under a new name. Both write the game to the recent list together with the per-move evaluations, which is what allows the evaluation curve and the quality counts to come back after a restart. Because the app tracks whether the position has changed since the last save, backing out of the game screen with unsaved moves triggers a dialog that offers to save, discard or cancel. SGF files can be opened and exported as well, in FF[4] format, which is the interchange format used by most other Go tools. **Copy SGF** puts the current record on the system clipboard without a file dialog.
 
 ---
 
