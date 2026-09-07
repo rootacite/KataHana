@@ -161,19 +161,22 @@ BLACK`、`conservativePass=true` 等），与客户端查询里的 `overrideSett
 ## 6.6 连接生命周期与退避重连
 
 `AnalysisClient` 在 init 里订阅 `settings.engineProfile`（`distinctUntilChanged` +
-`collectLatest`）——**改设置里的引擎地址/访问量会直接触发重连**。`runConnection`
-循环：
+`collectLatest`）——**改设置里的引擎地址/访问量会直接触发重连**。`engine_url` 仍是
+一条字符串，可用 `;` 分隔多个地址（`parseEngineUrls`：trim、丢掉空段）。`runConnection`
+每一轮按书写顺序试候选：
 
 ```
-Disconnected（URL 为空）
-   → Connecting → Ready（onOpen）/ Error（失败，记录原因）
-   → 断开 → delay(backoff) → 重试；backoff 从 1s 起倍增，封顶 15s
+Disconnected（解析后列表为空）
+   → 对每个 URL：Connecting（握手 4s）→ 第一个 onOpen 的进入 Ready，停在该 socket
+   → 本轮全失败 → Error（最后一条原因）→ delay(backoff) → 从列表头再扫
+   → 活连接断开 → backoff 复位 1s → 仍从列表头再扫（首选网关恢复后能抢回来）
+backoff 从 1s 起倍增，封顶 15s。连上后不对局中途抢切到更靠前的地址。
 ```
 
 引擎状态机 `EngineStatus(phase, detail)` 的 phase 有
 `Disconnected / Connecting / Ready / Analyzing / Error`，`online = Ready || Analyzing`。
 URL 规范化（`normalizeEngineUrl`）：缺 scheme 补 `ws://`、补尾斜杠、`token` 非空时
-拼成 `?token=` 查询参数。等待在线 `awaitOnline()` 最长 12 秒；单次查询超时 60 秒；
+拼成 `?token=` 查询参数；token 套在每一个候选上。等待在线 `awaitOnline()` 最长 20 秒；单次查询超时 60 秒；
 流式（forecast-own 多回合）超时 = 60s + 8s/回合。会话侧在 init 里收集
 `analysis.status`，检测到“刚变 online”就触发 `afterPositionChange()`（补发该发的
 AI 回合/实时分析）。

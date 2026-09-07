@@ -42,6 +42,8 @@ FadeTransition 时会把已 DESTROYED 的屏幕再试图切到 STARTED 而崩溃
 internal fun computeSessionLayout(
     maxWidth, maxHeight, mobile, chromePad,
     analysisMode = AnalysisLayoutMode.Auto,
+    preferredTreeW = 280.dp,
+    arrangement = AnalysisArrangement.Auto,
 ): SessionLayout
 ```
 
@@ -50,33 +52,44 @@ internal fun computeSessionLayout(
 - **桌面**从不出现 64dp 的竖条导航（`showRail` 仅 `mobile && maxWidth > maxHeight`，
   即横屏手机）；
 - 棋盘取可用区最大正方形（`min(w, h)`，下限 120dp）；有 rail 且放不下时压缩；
-- **横屏/宽屏**：棋盘右侧富余宽度 ≥ 168dp 就放侧边三栏
-  （`showSideTree`，宽度 clamp 在 168–280dp）；
+- **横屏/宽屏**：棋盘正方形与 rail 之后的富余 ≥ 168dp 就放侧边分析栏
+  （`showSideTree`）。默认宽度 280dp，可拖外沿；上限是「不挤占棋盘正方形和
+  胜负条 rail」的全部富余，下限 168dp。落盘键 `analysis_side_width_dp`。
 - **纵屏**（宽 ≤ 高）：棋盘上方富余高度 ≥ 200dp 时放顶部一行
-  （`showTopTree`）——从高到低依次是 Winrate 条、分析区、棋盘在底部；
+  （`showTopTree`）——从高到低依次是 Winrate 条、分析区、棋盘在底部；顶行已是全宽，
+  没有外沿拖宽。
 - 都不满足就只有棋盘。
 
-分析区默认是三张独立瓷器卡：`GameTreeCard` / `EvalGraphCard` / `QualityStatsCard`
-（纵屏横排、横屏竖叠）。窗口太窄或太矮时，三栏会换行或把中间的 Score 图挤没，
-于是 `tabbedAnalysis` 把三张卡合成**一张**瓷器，顶上三个胶囊 Tab
-（Game tree / Score / Quality）切换。Auto 启发式看**当前窗口**而不是机型：
+分析区默认是三张独立瓷器卡：`GameTreeCard` / `EvalGraphCard` / `QualityStatsCard`。
+`AnalysisArrangement`（Auto / Rows / Columns）决定三张卡是竖叠还是横排：默认
+**Rows（三行）**，横竖屏相同。Auto 仍是纵屏三列、横屏三行。三行/三列都可拖两根间线
+改比例（列默认 weight 1.15 / 1 / 0.9，行默认 1.4 / 1 / 0.8，落盘
+`analysis_col_weights` / `analysis_row_weights`，单卡宽不少于约 96dp、高不少于约
+72dp）。窗口太窄或太矮时，
+`tabbedAnalysis` 把三张卡合成**一张**瓷器，顶上三个胶囊 Tab
+（Game tree / Score / Quality）切换；Tab 模式没有间线，侧栏外沿仍可拖。
+Auto 启发式看**当前窗口**而不是机型：
 
 - 纵屏：`maxWidth < 560.dp`；
 - 横屏：侧栏高度（≈ `boardSide`）`< 420.dp`，或侧栏宽 `< 240.dp`。
 
 设置里 `AnalysisLayoutMode`（Auto / Compact=强制 Tab / Expanded=强制三栏）可覆盖
-误判。抽屉 `SidePanel` 仍是三张独立卡，不要改它的信息架构。
+误判；Three-card layout 在 Compact 下禁用。抽屉 `SidePanel` 仍是三张独立卡，不要改
+它的信息架构。
 
-纵屏顶行与横屏侧栏由 `EvalGraph.kt` / `GameTreeView.kt` 里的
-`SessionTreeRow` / `SessionTreeColumn` 组织。顶栏
+纵屏顶行与横屏侧栏由 `EvalGraph.kt` 里的 `SessionAnalysisPane` 组织。顶栏
 （纵屏 `SessionTopBar`）与侧 rail（横屏 `SessionRail`）放引擎状态点、菜单、
 `WinrateTrack`（胜负条）、`PlayIconCluster`（附加按钮 Resume / EndPreview / 确认
 在前，Pass/Undo/Redo 固定贴在簇的尾沿，避免 Undo 后出现的按钮把常驻三键挤开）。
 复盘时的退出键就是簇首位的 ▶| `Resume` 图标按钮。**横屏的 rail 与抽屉**：rail 是窄条快捷区，
-抽屉 `HanaDrawer`（ModalNavigationDrawer + Haze 模糊）承担全部次级功能，内容在
-`SidePanel.kt`：状态卡（座位、行棋方、手数/贴目/提子，点座位弹 Seat 弹窗）、AI
-状态、走子按钮簇、变化图行、三张分析卡、六个显示开关、整局复盘按钮、候选点卡、
-保存/另存/导出 SGF、返回与设置。**改动时不要重排抽屉的信息架构**（约定）。
+抽屉 `HanaDrawer`（叠在棋盘上的推拉层 + Haze 模糊）：**横屏从右侧、纵屏从下侧**滑出。
+打开时棋盘与分析栏不让位；非菜单区域只变暗、不模糊，点遮罩关闭。粉色标签贴在菜单外侧
+（横屏在左缘、纵屏在顶缘），不画在菜单内部。
+纵屏抽屉最高占屏幕一半高度，超出后 `SidePanel` 内部滚动。内容在 `SidePanel.kt`：
+状态卡（座位、行棋方、手数/贴目/提子，点座位弹 Seat 弹窗）、AI 状态、走子按钮簇、
+变化图行、三张分析卡、六个显示开关、整局复盘按钮、候选点卡、保存/另存/导出 SGF、
+返回与设置。关上时右缘（纵屏底缘）24dp 条滑入或点粉色标签打开。
+**改动时不要重排抽屉的信息架构**（约定）。
 
 ## 5.3 棋盘绘制与指针输入
 
@@ -108,7 +121,7 @@ internal fun computeSessionLayout(
 - **鼠标**：悬停出幽灵子（`onHover`），按下抬起 = 落子
   （`onActivate(point, isTouch=false)`），复盘时**右键抬起 = 长按预测**（`onForecast`）；
 - **触摸**：一次手势里区分——快抬 = 落子；按住超过长按阈值 = 预测；拖动 = 瞄准
-  （`onAim`，棋盘上划出“准备落这里”）；左缘横向滑动预留开抽屉。
+  （`onAim`，棋盘上划出“准备落这里”）。开抽屉在 `HanaDrawer` 的右缘（纵屏底缘）条，不在棋盘上。
 
 落子两段式：`confirmMove` 开关或触摸时，第一次点选“选中”（画幽灵子），再点同点
 确认（`confirmSelected` / `commit`）。这一切最终都汇入
@@ -171,7 +184,9 @@ Haze 采不到背后的 Home 页面，效果就退化成普通半透明——这
 - **弹窗是屏幕布局内的 overlay，不是独立窗口**：`HanaScrimModal`（
   `ui/components/HanaDialogs.kt`）是全屏黑色半透明 scrim（点 scrim 关闭，用
   `detectTapGestures`，避免 hover 高亮导致整屏闪动）+ 居中/贴底的
-  `FrostedSurface` 卡；
+  `FrostedSurface` 卡。新建对局与座位配置打开 `slideFromBottom`：遮罩只做
+  fade（并 haze 模糊背后一页），卡片从屏幕底边滑入/滑出，两层动画互不绑定；
+  这两张卡的自身模糊也加到 48.dp。离开确认、起名仍瞬时出现；
 - 每个有弹窗的屏幕准备**两套 HazeState**：一套给页面本体（棋盘/光晕装饰的
   `hazeSource`），一套 `overlayHaze` 把**整个页面内容**注册为 source；
   弹窗画在页面之上，是页面 source 的“邻居”而不是孩子；

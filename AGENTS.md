@@ -45,7 +45,7 @@ All paths relative to `shared/src/commonMain/kotlin/com/acite/katahana/` unless 
 | `domain/` | **Pure game logic, zero UI/reactive imports.** Board & rules (`Position`, `Rules`, `Move`, `Point`, `StoneColor`), the game tree (`GameTree`, `Node`, `TreeLayout`), the session facade (`GameSession`, `SessionSnapshot`), config/seats (`GameConfig`, `PlayerSeat`), analysis value types (`EvalSeries`, `Forecast`). |
 | `ai/` | Pure move choosers over engine outputs: `FullStrengthBot` (KataGo best), `RankBot` (KaTrain-calibrated rank AI), `HumanBot` (human-style sampling of the SL policy), `MoveQuality` (points-lost bands). |
 | `engine/` | The engine client: `AnalysisClient` (one WebSocket, query orchestration), `WsClient` + `EngineHttpClient` (expect/actual), `QueryBuilder` (query JSON per use), `AnalysisDto` (JSON schema), `Perspective` (winrate/score view + candidate + dead-stone logic), `EngineBenchmark`. |
-| `settings/` | `SettingsRepository`: single DataStore-preferences file, typed flows for every toggle/threshold/profile; `OwnershipStyle`; `AnalysisLayoutMode` (Auto / Compact tabs / Expanded three cards); coordinate edge/grid padding in dp. |
+| `settings/` | `SettingsRepository`: single DataStore-preferences file, typed flows for every toggle/threshold/profile; `OwnershipStyle`; `AnalysisLayoutMode` (Auto / Compact tabs / Expanded three cards); `AnalysisArrangement` (default Rows; also Auto / Columns); persisted side-column width and three-card row/column weights; coordinate edge/grid padding in dp. |
 | `recents/` | Recent-game index + persistence (`RecentGame`, `RecentGamesRepository`, `RecentGamesIndex`, `TextFiles` expect/actual). |
 | `sgf/` | Hand-rolled SGF v4 reader/writer (`SgfIo`) + platform file dialogs (`SgfFiles`). |
 | `changelog/` | Parsing of `git log` output for the in-app "What's new" list. |
@@ -91,8 +91,10 @@ Platform `actual`s live in the same package under `shared/src/{androidMain,jvmMa
 - **The engine is a judge, not a library.** Territory/score/ownership/winrate are never
   computed in-app; every answer comes from one WebSocket query to the local gateway. Rules
   (legal moves, captures, ko) are computed in-app.
-- **Protocol model:** one `WebSocket` connection per engine profile; the gateway relays
-  JSON to one KataGo process. Queries carry an `id = "<session>:<node>:<kind>:<nonce>"`;
+- **Protocol model:** a profile may list several WebSocket URLs separated by `;`; the
+  client tries them in order (4s handshake each) and keeps **one** live socket on the
+  first that answers. After a drop it rescans from the first URL. The gateway still
+  relays JSON to one KataGo process. Queries carry an `id = "<session>:<node>:<kind>:<nonce>"`;
   responses with a matching non-search id complete a one-shot waiter, in-search frames feed
   the live StateFlow. **At most one analysis query is in flight**; starting another first
   sends a `terminate` for the previous one.
@@ -126,7 +128,7 @@ Platform `actual`s live in the same package under `shared/src/{androidMain,jvmMa
 | Recent-game save/open | `recents/RecentGamesRepository.kt`, `RecentGame` |
 | SGF export/import | `sgf/SgfIo.kt` |
 | Screen navigation / back | `ui/navigation/`, `App.kt`, per-screen composables |
-| Session layout (portrait/landscape/desktop) | `ui/session/SessionLayout.kt` (`computeSessionLayout`) |
+| Session layout (portrait/landscape/desktop) | `ui/session/SessionLayout.kt` (`computeSessionLayout`, side-column clamp, three-card arrangement) |
 | Board paint order / animations | `ui/board/BoardCanvas.kt`, `Overlays.kt`, `Stones.kt` |
 | User-facing wording | `ui/Copy.kt` |
 | New palette / stone appearance | `ui/theme/Appearance.kt` + `Color.kt` (+ `AppearancePaletteTest`) |
