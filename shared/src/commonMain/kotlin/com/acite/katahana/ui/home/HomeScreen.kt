@@ -20,6 +20,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -63,6 +64,8 @@ import dev.chrisbanes.haze.rememberHazeState
 import dev.zacsweers.metrox.viewmodel.metroViewModel
 import kotlinx.coroutines.launch
 
+private const val HomeRecentPreview = 4
+
 class HomeScreen : Screen {
     @Composable
     override fun Content() {
@@ -74,12 +77,27 @@ class HomeScreen : Screen {
 private fun HomeRoute() {
     val navigator = LocalNavigator.currentOrThrow
     var newMode by remember { mutableStateOf<PlayMode?>(null) }
+    var browseRecents by remember { mutableStateOf(false) }
     val sgfFiles = LocalSgfFiles.current
     val appExit = LocalAppExit.current
     val scope = rememberCoroutineScope()
     val homeVm = metroViewModel<HomeViewModel>()
     val lastGame by homeVm.lastGame.collectAsState()
     val recents by homeVm.recentGames.collectAsState()
+    LaunchedEffect(browseRecents, recents.size) {
+        if (browseRecents && recents.isEmpty()) browseRecents = false
+    }
+    fun openRecent(game: RecentGame) {
+        val loaded = homeVm.openRecent(game.id) ?: return
+        navigator.push(
+            SessionScreen(
+                config = loaded.config,
+                loadedTree = loaded.tree,
+                recentId = loaded.record.id,
+                recentTitle = loaded.record.title,
+            ),
+        )
+    }
 
     val openSgf: () -> Unit = {
         scope.launch {
@@ -126,7 +144,13 @@ private fun HomeRoute() {
                             .verticalScroll(rememberScrollState()),
                         verticalArrangement = Arrangement.spacedBy(16.dp),
                     ) {
-                        RecentSection(hazeState, recents, homeVm, navigator)
+                        RecentSection(
+                            hazeState,
+                            recents,
+                            homeVm,
+                            onOpen = ::openRecent,
+                            onMore = { browseRecents = true },
+                        )
                         ChangelogSection(hazeState)
                     }
                 }
@@ -148,7 +172,13 @@ private fun HomeRoute() {
                         onSettings = { navigator.push(SettingsScreen()) },
                         onQuit = { appExit.exit() },
                     )
-                    RecentSection(hazeState, recents, homeVm, navigator)
+                    RecentSection(
+                        hazeState,
+                        recents,
+                        homeVm,
+                        onOpen = ::openRecent,
+                        onMore = { browseRecents = true },
+                    )
                     ChangelogSection(hazeState)
                 }
             }
@@ -172,6 +202,28 @@ private fun HomeRoute() {
                 slideFromBottom = true,
             ) {
                 NewGameSheet(onStart = start, initial = lastGame, lockedMode = newMode)
+            }
+        }
+        if (browseRecents) {
+            HanaScrimModal(
+                onDismiss = { browseRecents = false },
+                hazeState = overlayHaze,
+                alignment = if (landscape) Alignment.Center else Alignment.BottomCenter,
+                modifier = if (landscape) {
+                    Modifier.widthIn(max = 420.dp).fillMaxWidth()
+                } else {
+                    Modifier.fillMaxWidth()
+                },
+                slideFromBottom = true,
+            ) {
+                RecentsBrowserSheet(
+                    recents = recents,
+                    homeVm = homeVm,
+                    onOpen = { game ->
+                        browseRecents = false
+                        openRecent(game)
+                    },
+                )
             }
         }
     }
@@ -237,30 +289,60 @@ private fun RecentSection(
     hazeState: HazeState,
     recents: List<RecentGame>,
     homeVm: HomeViewModel,
-    navigator: cafe.adriel.voyager.navigator.Navigator,
+    onOpen: (RecentGame) -> Unit,
+    onMore: () -> Unit,
 ) {
-    PorcelainCard(hazeState, title = Copy.recent) {
+    PorcelainCard(hazeState) {
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                Copy.recent,
+                color = hanaColors.textDim,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.weight(1f),
+            )
+            if (recents.size > HomeRecentPreview) {
+                QuietTextButton(Copy.more, onClick = onMore)
+            }
+        }
         if (recents.isEmpty()) {
             Text(Copy.noRecent, color = hanaColors.textDim, fontSize = 14.sp)
         } else {
-            recents.forEach { game ->
+            recents.take(HomeRecentPreview).forEach { game ->
                 RecentGameCard(
                     game = game,
                     now = epochMillis(),
-                    onOpen = {
-                        val loaded = homeVm.openRecent(game.id) ?: return@RecentGameCard
-                        navigator.push(
-                            SessionScreen(
-                                config = loaded.config,
-                                loadedTree = loaded.tree,
-                                recentId = loaded.record.id,
-                                recentTitle = loaded.record.title,
-                            ),
-                        )
-                    },
+                    onOpen = { onOpen(game) },
                     onRemove = { homeVm.removeRecent(game.id) },
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun RecentsBrowserSheet(
+    recents: List<RecentGame>,
+    homeVm: HomeViewModel,
+    onOpen: (RecentGame) -> Unit,
+) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Text(Copy.recent, color = hanaColors.text, fontSize = 22.sp)
+        recents.forEach { game ->
+            RecentGameCard(
+                game = game,
+                now = epochMillis(),
+                onOpen = { onOpen(game) },
+                onRemove = { homeVm.removeRecent(game.id) },
+            )
         }
     }
 }

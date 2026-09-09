@@ -53,7 +53,6 @@ import com.acite.katahana.engine.EngineStatus
 import com.acite.katahana.sgf.LocalSgfFiles
 import com.acite.katahana.ui.Copy
 import com.acite.katahana.ui.board.BoardCanvas
-import com.acite.katahana.ui.components.EngineDot
 import com.acite.katahana.ui.components.LeaveGameDialog
 import com.acite.katahana.ui.components.QuietTextButton
 import com.acite.katahana.ui.components.SaveNameDialog
@@ -124,7 +123,8 @@ private fun SessionRoute(vm: SessionViewModel) {
     val coordGridPadDp by vm.coordGridPadDp.collectAsState()
     val navigator = LocalNavigator.currentOrThrow
     val snapshot = ui.snapshot
-    val boardCandidates = if (showCandidates) ui.candidates else emptyList()
+    var peekCandidates by remember { mutableStateOf(false) }
+    val boardCandidates = if (showCandidates || peekCandidates) ui.candidates else emptyList()
     val boardQualities = if (showQuality) ui.qualities else emptyList()
     val sgfFiles = LocalSgfFiles.current
     val scope = rememberCoroutineScope()
@@ -285,6 +285,8 @@ private fun SessionRoute(vm: SessionViewModel) {
                         forecastActive = ui.forecast != null,
                         onEndForecast = vm::endForecast,
                         onExitReview = vm::exitReview,
+                        peekCandidates = peekCandidates,
+                        onPeekCandidatesChange = { peekCandidates = it },
                     )
                 }
                 BoxWithConstraints(
@@ -413,6 +415,8 @@ private fun SessionRoute(vm: SessionViewModel) {
                                         forecastActive = ui.forecast != null,
                                         onEndForecast = vm::endForecast,
                                         onExitReview = vm::exitReview,
+                                        peekCandidates = peekCandidates,
+                                        onPeekCandidatesChange = { peekCandidates = it },
                                         modifier = Modifier
                                             .width(SessionRailWidth)
                                             .fillMaxHeight(),
@@ -482,6 +486,8 @@ internal fun SessionTopBar(
     forecastActive: Boolean = false,
     onEndForecast: () -> Unit = {},
     onExitReview: () -> Unit = {},
+    peekCandidates: Boolean = false,
+    onPeekCandidatesChange: (Boolean) -> Unit = {},
     compact: Boolean = false,
 ) {
     Row(
@@ -491,8 +497,6 @@ internal fun SessionTopBar(
             .padding(horizontal = if (compact) 4.dp else 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        EngineDot(online = status.online)
-        Spacer(Modifier.width(if (compact) 6.dp else 8.dp))
         MenuChip(compact = compact, onClick = onMenu)
         Spacer(Modifier.width(if (compact) 6.dp else 8.dp))
         WinrateTrack(
@@ -511,6 +515,8 @@ internal fun SessionTopBar(
             forecastActive = forecastActive,
             onEndForecast = onEndForecast,
             onExitReview = onExitReview,
+            peekCandidates = peekCandidates,
+            onPeekCandidatesChange = onPeekCandidatesChange,
         )
     }
 }
@@ -530,6 +536,8 @@ private fun SessionRail(
     forecastActive: Boolean = false,
     onEndForecast: () -> Unit = {},
     onExitReview: () -> Unit = {},
+    peekCandidates: Boolean = false,
+    onPeekCandidatesChange: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -537,7 +545,6 @@ private fun SessionRail(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        EngineDot(online = status.online)
         MenuChip(compact = true, onClick = onMenu)
         WinrateTrack(
             Modifier
@@ -559,6 +566,8 @@ private fun SessionRail(
             forecastActive = forecastActive,
             onEndForecast = onEndForecast,
             onExitReview = onExitReview,
+            peekCandidates = peekCandidates,
+            onPeekCandidatesChange = onPeekCandidatesChange,
             vertical = true,
         )
     }

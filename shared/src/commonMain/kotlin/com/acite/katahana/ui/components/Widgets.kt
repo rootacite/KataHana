@@ -12,9 +12,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -203,17 +201,6 @@ fun CapsuleChoice(
     ) {
         Text(text, color = fg, fontSize = 13.sp, fontWeight = FontWeight.Medium)
     }
-}
-
-@Composable
-fun EngineDot(online: Boolean, modifier: Modifier = Modifier) {
-    val colors = hanaColors
-    Box(
-        modifier
-            .size(10.dp)
-            .clip(CircleShape)
-            .background(if (online) colors.accentPink else colors.accentPink.copy(alpha = 0.28f)),
-    )
 }
 
 @Composable

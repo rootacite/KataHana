@@ -3,6 +3,9 @@ package com.acite.katahana.ui.session
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -22,6 +26,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -77,6 +82,8 @@ fun PlayIconCluster(
     forecastActive: Boolean = false,
     onEndForecast: () -> Unit = {},
     onExitReview: () -> Unit = {},
+    peekCandidates: Boolean = false,
+    onPeekCandidatesChange: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
     vertical: Boolean = false,
 ) {
@@ -93,6 +100,14 @@ fun PlayIconCluster(
         PlayGlyphButton(PlayGlyph.Pass, Copy.pass, humanTurn, onPass)
         PlayGlyphButton(PlayGlyph.Undo, Copy.undo, snapshot.humanControls && snapshot.canUndo, onUndo)
         PlayGlyphButton(PlayGlyph.Redo, Copy.redo, snapshot.humanControls && snapshot.canRedo, onRedo)
+        PlayGlyphButton(
+            PlayGlyph.PeekCandidates,
+            Copy.showCandidates,
+            enabled = true,
+            onClick = {},
+            emphasized = peekCandidates,
+            onHeld = onPeekCandidatesChange,
+        )
     }
     if (vertical) {
         Column(
@@ -111,7 +126,7 @@ fun PlayIconCluster(
     }
 }
 
-private enum class PlayGlyph { Pass, Undo, Redo, Confirm, EndForecast, Resume }
+private enum class PlayGlyph { Pass, Undo, Redo, Confirm, EndForecast, Resume, PeekCandidates }
 
 @Composable
 private fun PlayGlyphButton(
@@ -120,6 +135,7 @@ private fun PlayGlyphButton(
     enabled: Boolean,
     onClick: () -> Unit,
     emphasized: Boolean = false,
+    onHeld: ((Boolean) -> Unit)? = null,
 ) {
     val tint = when {
         !enabled -> hanaColors.textDim.copy(alpha = 0.38f)
@@ -130,6 +146,24 @@ private fun PlayGlyphButton(
         emphasized && enabled -> hanaColors.accentPink
         else -> Color.Transparent
     }
+    val latestHeld = rememberUpdatedState(onHeld)
+    val press = if (onHeld != null) {
+        Modifier.pointerInput(enabled) {
+            if (!enabled) return@pointerInput
+            awaitEachGesture {
+                val down = awaitFirstDown()
+                down.consume()
+                latestHeld.value?.invoke(true)
+                try {
+                    waitForUpOrCancellation()
+                } finally {
+                    latestHeld.value?.invoke(false)
+                }
+            }
+        }
+    } else {
+        Modifier.clickable(enabled = enabled, onClick = onClick)
+    }
     Box(
         modifier = Modifier
             .size(36.dp)
@@ -139,7 +173,7 @@ private fun PlayGlyphButton(
                 contentDescription = label
                 role = Role.Button
             }
-            .clickable(enabled = enabled, onClick = onClick),
+            .then(press),
         contentAlignment = Alignment.Center,
     ) {
         Canvas(Modifier.size(18.dp)) {
@@ -207,6 +241,11 @@ private fun DrawScope.drawPlayGlyph(glyph: PlayGlyph, color: Color) {
                 strokeWidth = stroke.width,
                 cap = StrokeCap.Round,
             )
+        }
+        PlayGlyph.PeekCandidates -> {
+            drawCircle(color, radius = s * 0.16f, center = Offset(s * 0.32f, s * 0.36f), style = stroke)
+            drawCircle(color, radius = s * 0.13f, center = Offset(s * 0.70f, s * 0.30f), style = stroke)
+            drawCircle(color, radius = s * 0.11f, center = Offset(s * 0.56f, s * 0.72f), style = stroke)
         }
     }
 }

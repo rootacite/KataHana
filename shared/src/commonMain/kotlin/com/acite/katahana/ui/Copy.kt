@@ -16,6 +16,7 @@ object Copy {
     const val boardSection = "Board"
     const val comingLater = "Coming later"
     const val recent = "Recent games"
+    const val more = "More"
     const val noRecent = "No games yet — start one."
     const val save = "Save"
     const val saveAs = "Save as"
