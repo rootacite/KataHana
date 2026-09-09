@@ -57,6 +57,7 @@ data class RecentGame(
   （SGF 标准没有座位概念），只存在 RecentGame 字段里。
 - 仓库（`RecentGamesRepository`）内部持有 `Mutex` + `StateFlow<List<RecentGame>>`；
   `upsert` 头插并裁剪到 40 条、`remove` 删除、每次变更同步写盘并更新内存。
+  主屏 Recent 卡片只展示最近 4 条，超出时点 **More** 弹出可滚动浏览窗看全表。
   `upsertSync` 是“最后抢救”用的无锁版本——VM 在 `leave()`/`onCleared()` 时把评估
   缓存刷回存档（`flushBoundEvals`）就走它。
 - **打开一条存档**（`open(id)`）是理解“存档如何变回一局”的关键：`parseSgf(sgf)`

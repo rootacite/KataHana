@@ -52,7 +52,7 @@ All paths relative to `shared/src/commonMain/kotlin/com/acite/katahana/` unless 
 | `ui/theme/` | Appearance model (`Appearance`, stone swatches), palettes (`HanaPalette`/`hanaColors`), Compose theme, tokens, Nunito typography. |
 | `ui/components/` | Shared chrome: `ScreenChrome` (frosted surfaces, backdrop, glow orbs), `Widgets` (buttons/controls), `HanaDialogs` (scrim modals; sheet content scrolls when taller than the window), `RankLadder`. |
 | `ui/board/` | Board rendering: `BoardCanvas` (single Canvas, all layers), `BoardHit` (geometry + hit test), `Stones`, `Connections` (under-stone shapes), `Overlays` (ownership styles), `QualityFaces`. |
-| `ui/home/` `ui/session/` `ui/settings/` `ui/engine/` | Screens + their ViewModels. Session is the largest: `SessionScreen`, `SessionViewModel`, `SessionLayout`, `SidePanel` (drawer content), `EvalGraph`, `GameTreeView`, `PlayActionsBar`, `SeatDialog`. |
+| `ui/home/` `ui/session/` `ui/settings/` `ui/engine/` | Screens + their ViewModels. Session is the largest: `SessionScreen`, `SessionViewModel`, `SessionLayout`, `SidePanel` (drawer content), `EvalGraph`, `GameTreeView`, `PlayActionsBar` (hold-to-peek Top moves on the persistent cluster), `SeatDialog`. Home recent list shows 4 rows plus a More sheet. |
 | `ui/navigation/` | Back handling and the Android lifecycle owner used by screens. |
 | `ui/Copy.kt` | **Every user-facing string in the app** (single copy layer, no resource files). |
 | `App.kt` | Common app root: DI plumbing, theme, Voyager `Navigator`. |

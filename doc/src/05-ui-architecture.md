@@ -17,7 +17,7 @@ onDispose 清空）→ `ProvideHanaScreenLifecycle` → **根级** `SettingsView
 | `EngineSettingsScreen` | Home/Settings 点引擎 |
 | `SessionScreen(config, loadedTree?, recentId?, recentTitle?)` | 开始新对局 / 读 SGF / 打开最近对局 |
 
-弹窗（New Game 弹层、Seat 弹窗、离开确认、起名）**不是导航目的地**，是屏幕内的
+弹窗（New Game 弹层、最近对局浏览、Seat 弹窗、离开确认、起名）**不是导航目的地**，是屏幕内的
 overlay（见 5.5）。返回键：App 层 `HanaBackHandler(enabled = navigator.canPop)` 负责
 出栈；`SessionScreen` 自己注册返回处理——有未保存改动时弹“离开/保存”确认。
 
@@ -78,9 +78,10 @@ Auto 启发式看**当前窗口**而不是机型：
 它的信息架构。
 
 纵屏顶行与横屏侧栏由 `EvalGraph.kt` 里的 `SessionAnalysisPane` 组织。顶栏
-（纵屏 `SessionTopBar`）与侧 rail（横屏 `SessionRail`）放引擎状态点、菜单、
+（纵屏 `SessionTopBar`）与侧 rail（横屏 `SessionRail`）放菜单、
 `WinrateTrack`（胜负条）、`PlayIconCluster`（附加按钮 Resume / EndPreview / 确认
-在前，Pass/Undo/Redo 固定贴在簇的尾沿，避免 Undo 后出现的按钮把常驻三键挤开）。
+在前，Pass/Undo/Redo 固定贴在簇的尾沿，避免 Undo 后出现的按钮把常驻三键挤开；
+簇最末是按住预览 Top moves 的键，松手即关，不落盘、不改抽屉开关）。
 复盘时的退出键就是簇首位的 ▶| `Resume` 图标按钮。**横屏的 rail 与抽屉**：rail 是窄条快捷区，
 抽屉 `HanaDrawer`（叠在棋盘上的推拉层 + Haze 模糊）：**横屏从右侧、纵屏从下侧**滑出。
 打开时棋盘与分析栏不让位；非菜单区域只变暗、不模糊，点遮罩关闭。粉色标签贴在菜单外侧
